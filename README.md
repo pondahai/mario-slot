@@ -198,6 +198,68 @@ steer: 0.03,       // 控制器的積分速率，越大修正越快、波動越�
 
 ---
 
+---
+
+## 音效：從一段連續錄音切出來
+
+`tools/slice_audio.py` 負責把真機錄音切成遊戲音效，跟切圖同一套路：素材放原始檔、
+切割規則寫成純文字、重跑就能得到一樣的結果。
+
+需要的套件（pip 就能裝，不必系統權限）：
+
+```
+pip install imageio-ffmpeg numpy pillow
+```
+
+### 三個步驟
+
+```
+# 1. 自動找出「聲音在哪裡」
+python3 tools/slice_audio.py analyze audio/src/raw.mp4
+#    → audio/work/segments.tsv   候選片段清單
+#    → audio/work/waveform.png   標了編號的波形圖
+#    → audio/work/preview/*.wav  每段的試聽檔
+
+# 2. 編輯 segments.tsv 把 name 欄改成正式名稱、刪掉不要的列，然後切
+python3 tools/slice_audio.py cut audio/src/raw.mp4
+#    → audio/clips/*.wav
+
+# 3. 打包成單一檔案 + 偏移表
+python3 tools/slice_audio.py sprite
+#    → assets/audio/sprite.mp3 / sprite.ogg / sprite.json
+```
+
+**機器只能自動找「邊界」，沒辦法知道第 47 段是中獎還是押注 —— 中間那步一定要人工命名。**
+
+### 幾個會遇到的狀況
+
+- **跑燈聲被當成一整塊**：跑燈是同一顆「嗶」快速重複，間隔可能只有 35ms，
+  低於預設的 `--min-silence 0.08` 就會黏在一起。調成 `--min-silence 0.02` 就會拆開。
+  遊戲只需要**一顆乾淨的 tick**，重複播放由程式負責。
+- **底噪重**：`--threshold` 調高（例如 `-35`）避免把噪音當片段；切的時候加
+  `--denoise` 開降噪，但音色會偏金屬感，能不開就不開。
+- **背景音樂混進去**：機台待機音樂常常一直在播，切出來會帶音樂尾巴。
+  優先挑「音樂安靜、只按單一按鍵」的片段。
+
+### 需要哪些音效
+
+`coin` `bet` `tick` `land` `win_small` `win_big` `win_bar` `lose`
+`special` `bonus` `double_in` `double_roll` `double_win` `double_lose`
+`wash` `payout`
+
+### 音質處理的取捨
+
+去頭尾靜音、淡入淡出、正規化都在 numpy 做，不用 ffmpeg 濾波器，原因寫在程式碼裡：
+
+- `silenceremove,areverse,silenceremove,areverse` 這個常見寫法會整段吃掉
+  （實測 0.48s 的旋律變成 0.000s）。
+- `dynaudnorm` 之類的動態正規化會把衰減的尾音推上來、改掉音色。這裡的目標是
+  保留真機音色，所以只做固定增益的峰值正規化（預設 −1 dBFS），片段內部的
+  強弱關係完全不變。
+- 兩端各加 3ms 淡入淡出，避免切點落在非零處造成「喀」的爆音。
+
+---
+
 ## 檔案
 
 ```
@@ -205,7 +267,9 @@ index.html                 頁面結構
 styles.css                 版面與所有感應區的座標
 script.js                  遊戲邏輯、七段顯示器、跑燈、機率控制器
 tools/slice_assets.py      從原圖切出四個零件
+tools/slice_audio.py       從錄音切出音效並打包成 sprite
 assets/*.png               切好的零件
+assets/audio/              音效 sprite（有音源之後才會有）
 34d80fa1-....jpg           原始排版圖（切圖的來源，請保留）
 ```
 

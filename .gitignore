@@ -1,0 +1,3 @@
+# 音效切割的中介檔：來源 wav、試聽片段、波形圖。
+# 這些都能用 tools/slice_audio.py 從原始錄音重新產生，不進版控。
+audio/work/
