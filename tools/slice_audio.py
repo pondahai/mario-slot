@@ -56,7 +56,10 @@ OUT_DIR = os.path.join(ROOT, "assets", "audio")
 
 # 中介檔一律轉成這個規格，後面所有分析都以它為準
 SR = 32000          # 取樣率：機台音效都是方波/短促音，32k 綽綽有餘
-SPRITE_GAP = 0.06   # sprite 裡片段之間留的空白秒數，避免播放時吃到隔壁
+# sprite 裡片段之間留的空白秒數。留得夠寬有兩個作用：播放時不會吃到隔壁，
+# 而且網頁端可以靠「找出這些靜音」重新推算每段的位置 —— mp3 解碼會在開頭多出
+# 編碼器延遲，硬套 json 裡的偏移量會整批位移，對 37ms 的 tick 是致命的。
+SPRITE_GAP = 0.10
 
 
 # ── ffmpeg ──────────────────────────────────────────────────────────
@@ -378,6 +381,12 @@ def cmd_sprite(args):
     if not os.path.isdir(CLIP_DIR):
         sys.exit("找不到 %s，請先執行 cut" % CLIP_DIR)
     clips = sorted(f for f in os.listdir(CLIP_DIR) if f.endswith(".wav"))
+    if args.only:
+        want = [n.strip() for n in args.only.split(",") if n.strip()]
+        missing = [n for n in want if n + ".wav" not in clips]
+        if missing:
+            sys.exit("找不到這些片段：" + ", ".join(missing))
+        clips = [n + ".wav" for n in want]
     if not clips:
         sys.exit("%s 裡沒有 wav" % CLIP_DIR)
 
@@ -453,6 +462,8 @@ def main():
 
     s = sub.add_parser("sprite", help="把片段打包成單一檔案 + 偏移表")
     s.add_argument("--bitrate", default="64k")
+    s.add_argument("--only", default="",
+                   help="只打包指定的片段（逗號分隔），順序照給的順序")
     s.set_defaults(func=cmd_sprite)
 
     args = ap.parse_args()

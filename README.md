@@ -243,11 +243,34 @@ python3 tools/slice_audio.py sprite
 - **背景音樂混進去**：機台待機音樂常常一直在播，切出來會帶音樂尾巴。
   優先挑「音樂安靜、只按單一按鍵」的片段。
 
-### 需要哪些音效
+### 目前接進遊戲的音效
 
-`coin` `bet` `tick` `land` `win_small` `win_big` `win_bar` `lose`
-`special` `bonus` `double_in` `double_roll` `double_win` `double_lose`
-`wash` `payout`
+音源是真機錄音，時間軸標記在 `audio/cues/machine.tsv`。
+
+| 名稱 | 觸發 | 說明 |
+| --- | --- | --- |
+| `coin` | 點投幣器 | 1.28s，一連串機械撞擊；連點時會中斷前一次 |
+| `bet` | 押注鍵、全押 | 0.43s |
+| `tick1`–`tick4` | 跑燈每前進一格、比倍號碼滾動 | 各 37ms，四顆輪流播放 |
+
+跑燈刻意用四顆輪流而不是一顆重複 —— 真機的跑燈是一段音階（實測音高
+`750 812 875 938 1000 1062 …` 上行），單顆重複會很單調。
+
+還缺的：`land` `win_*` `lose` `special` `bonus` `double_*` `wash` `payout`，
+等有音源再補。
+
+### 播放：為什麼不直接用 sprite.json 的偏移量
+
+網頁端載入後**不直接採用** `sprite.json` 裡的起點，而是從解碼後的波形裡找出
+片段之間那 0.1 秒的靜音，重新推算邊界（`Sound._mapClips`）。
+
+原因是有些瀏覽器解碼壓縮音訊時會在開頭多出編碼器延遲，整批偏移量會一起位移；
+tick 只有 37ms，位移個十幾毫秒就完全走鐘。實測 Chromium 會處理 mp3 的
+gapless 資訊、位移只有 −0.7ms（ogg 是 −5.7ms），但不是每個瀏覽器都這樣，
+所以用偵測當保險。偵測到的段數跟預期不符時會退回 json 的偏移量。
+
+音效用 Web Audio API 而不是 `<audio>` 元素：跑燈最快 34ms 響一次，
+`<audio>` 的延遲和重複觸發跟不上。
 
 ### 音質處理的取捨
 

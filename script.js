@@ -26,6 +26,148 @@ const CONFIG = {
     steer: 0.03,          // 吃分／吐分控制器的積分速率：越大修正越快、波動越小
 };
 
+/* ── 音效 ──────────────────────────────────────────────────
+
+   音源是真機錄音，用 tools/slice_audio.py 切好、接成一個 sprite
+   （assets/audio/sprite.ogg / .mp3 + sprite.json）。
+
+   用 Web Audio 而不是 <audio> 元素：跑燈最快 34ms 就要響一次，
+   <audio> 的播放延遲和重複觸發根本跟不上。
+
+   關於偏移量：sprite.json 裡有每段的起點，但**不直接拿來用**。mp3 解碼
+   會在開頭多出編碼器延遲（約 1100 個取樣），整批偏移量會一起位移，對
+   37ms 的 tick 等於全錯。所以載入後改成從解碼結果裡「找出片段之間那
+   0.1 秒的靜音」來重新推算邊界，json 只用來提供名稱順序與備援。      */
+
+const Sound = {
+    ctx: null,
+    buffer: null,
+    clips: {},          // name → [起點秒, 長度秒]
+    ready: false,
+    enabled: true,
+    volume: 0.7,
+    _master: null,
+    _live: {},          // name → 正在播放的 source，長音效用來自我中斷
+
+    /** 第一次使用者互動時才建立 AudioContext —— 瀏覽器會擋掉更早的嘗試。 */
+    unlock() {
+        if (!this.ctx) {
+            const AC = window.AudioContext || window.webkitAudioContext;
+            if (!AC) return;
+            this.ctx = new AC();
+            this._master = this.ctx.createGain();
+            this._master.connect(this.ctx.destination);
+            this._applyVolume();
+            this.load();
+        }
+        if (this.ctx.state === 'suspended') this.ctx.resume();
+    },
+
+    async load() {
+        try {
+            const meta = await (await fetch('assets/audio/sprite.json')).json();
+            const probe = document.createElement('audio');
+            const ext = probe.canPlayType('audio/ogg; codecs=vorbis') ? 'ogg' : 'mp3';
+            const raw = await (await fetch('assets/audio/sprite.' + ext)).arrayBuffer();
+            this.buffer = await this.ctx.decodeAudioData(raw);
+            this.clips = this._mapClips(meta);
+            this.ready = true;
+        } catch (err) {
+            console.warn('音效載入失敗，遊戲照常運作：', err);
+        }
+    },
+
+    /**
+     * 從解碼後的波形找出片段邊界。
+     *
+     * 片段之間有 0.1 秒的數位靜音，找出這些靜音就能重建每段的位置，
+     * 不受編碼器延遲影響。數量對不上時退回 json 裡的偏移量。
+     */
+    _mapClips(meta) {
+        const names = Object.keys(meta.clips).sort(
+            (a, b) => meta.clips[a][0] - meta.clips[b][0]);
+        const data = this.buffer.getChannelData(0);
+        const sr = this.buffer.sampleRate;
+        const win = Math.max(1, Math.round(sr * 0.005));
+        const quiet = 0.004;                       // 約 −48 dBFS
+        const minGap = Math.round(0.05 / 0.005);   // 至少 50ms 才算間隔
+
+        const regions = [];
+        let start = -1, run = 0;
+        for (let i = 0; i + win <= data.length; i += win) {
+            let peak = 0;
+            for (let j = i; j < i + win; j++) {
+                const v = Math.abs(data[j]);
+                if (v > peak) peak = v;
+            }
+            if (peak > quiet) {
+                if (start < 0) start = i;
+                run = 0;
+            } else if (start >= 0 && ++run >= minGap) {
+                regions.push([start / sr, (i - run * win) / sr]);
+                start = -1;
+                run = 0;
+            }
+        }
+        if (start >= 0) regions.push([start / sr, data.length / sr]);
+
+        const out = {};
+        if (regions.length === names.length) {
+            names.forEach((n, i) => {
+                out[n] = [regions[i][0], regions[i][1] - regions[i][0]];
+            });
+        } else {
+            console.warn('音效邊界偵測到 %d 段、預期 %d 段，改用 json 偏移量',
+                         regions.length, names.length);
+            names.forEach(n => { out[n] = meta.clips[n].slice(); });
+        }
+        return out;
+    },
+
+    /** 播放一段。rate 可以微調音高，solo 會中斷同名的前一次播放。 */
+    play(name, opts = {}) {
+        if (!this.ready || !this.enabled) return;
+        const clip = this.clips[name];
+        if (!clip) return;
+        if (this.ctx.state === 'suspended') this.ctx.resume();
+
+        if (opts.solo && this._live[name]) {
+            try { this._live[name].stop(); } catch (e) { /* 已經停了 */ }
+        }
+
+        const src = this.ctx.createBufferSource();
+        src.buffer = this.buffer;
+        src.playbackRate.value = opts.rate || 1;
+        const gain = this.ctx.createGain();
+        gain.gain.value = opts.gain == null ? 1 : opts.gain;
+        src.connect(gain).connect(this._master);
+        src.start(0, clip[0], clip[1]);
+        if (opts.solo) {
+            this._live[name] = src;
+            src.onended = () => { if (this._live[name] === src) this._live[name] = null; };
+        }
+    },
+
+    setEnabled(on) {
+        this.enabled = on;
+        if (on) this.unlock();
+        localStorage.setItem('marioSlotSound', on ? '1' : '0');
+    },
+
+    setVolume(v) {
+        this.volume = v;
+        this._applyVolume();
+        localStorage.setItem('marioSlotVolume', String(v));
+    },
+
+    _applyVolume() {
+        if (this._master) this._master.gain.value = this.volume;
+    },
+};
+
+// 跑燈的四顆 tick 輪流播放。真機的跑燈是一段音階，單顆重複會很單調。
+const TICKS = ['tick1', 'tick2', 'tick3', 'tick4'];
+
 /* ── 八個可押注圖案與賠率 ──────────────────────────────── */
 
 const SYMBOLS = {
@@ -270,6 +412,20 @@ function buildOddsTable() {
 }
 
 function bindGlobal() {
+    // 瀏覽器規定要有使用者互動才能出聲，所以第一次點擊／按鍵時才建立 AudioContext
+    const unlock = () => Sound.unlock();
+    document.addEventListener('pointerdown', unlock, { once: true });
+    document.addEventListener('keydown', unlock, { once: true });
+
+    const soundToggle = document.getElementById('sound-toggle');
+    const volumeSlider = document.getElementById('volume-slider');
+    Sound.enabled = localStorage.getItem('marioSlotSound') !== '0';
+    Sound.volume = parseFloat(localStorage.getItem('marioSlotVolume') || '0.7');
+    soundToggle.checked = Sound.enabled;
+    volumeSlider.value = Sound.volume;
+    soundToggle.addEventListener('change', e => Sound.setEnabled(e.target.checked));
+    volumeSlider.addEventListener('input', e => Sound.setVolume(parseFloat(e.target.value)));
+
     document.getElementById('coin-slot').addEventListener('click', insertCoin);
 
     document.getElementById('debug-toggle').addEventListener('change', e => {
@@ -298,6 +454,7 @@ function insertCoin() {
     if (state.phase === 'spinning' || state.phase === 'reveal') return;
     if (state.credit + CONFIG.coinValue > CONFIG.maxCredit) return flash('分數已滿');
     state.credit += CONFIG.coinValue;
+    Sound.play('coin', { solo: true });
     render();
 }
 
@@ -307,6 +464,7 @@ function placeBet(sym) {
     if (state.credit < 1) return flash('分數不足　請投幣');
     state.credit -= 1;
     state.bets[sym] += 1;
+    Sound.play('bet');
     render();
 }
 
@@ -317,6 +475,7 @@ function betAll() {
     if (state.credit < room.length) return flash('分數不足　請投幣');
     state.credit -= room.length;
     room.forEach(s => { state.bets[s] += 1; });
+    Sound.play('bet');
     render();
 }
 
@@ -460,6 +619,7 @@ function startSpin() {
         lamps[state.pos].classList.remove('on');
         state.pos = (state.pos + 1) % 24;
         lamps[state.pos].classList.add('on');
+        Sound.play(TICKS[i % TICKS.length]);
         i++;
 
         if (i >= steps) return settle(target, stake, free ? 0 : stake);
@@ -545,6 +705,7 @@ function guess(side) {
     const roll = () => {
         rolls++;
         if (rolls < 12) {
+            Sound.play(TICKS[rolls % TICKS.length]);
             writeDisplay(el.center, 1 + Math.floor(Math.random() * 14));
             setTimeout(roll, 40 + rolls * 8);
             return;

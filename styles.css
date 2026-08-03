@@ -327,6 +327,8 @@ kbd {
 .rules li { margin-bottom: 4px; }
 .note { color: #8d8272; font-size: 12px; margin: 8px 0 0; }
 .toggle { display: block; margin-top: 10px; color: #cdc3b1; cursor: pointer; }
+.slider-row { display: flex; align-items: center; gap: 10px; }
+.slider-row input[type="range"] { flex: 1; accent-color: #ffcf6a; }
 
 @media (max-width: 720px) {
     .stage { padding: 12px 10px 40px; }
