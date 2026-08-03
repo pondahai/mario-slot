@@ -1,0 +1,39 @@
+# 把整個 repo 當靜態網站發佈到 GitHub Pages。
+# 沒有建置步驟 —— index.html / styles.css / script.js / assets 直接上傳。
+name: Deploy to GitHub Pages
+
+on:
+  push:
+    branches:
+      - master
+      # 這個開發分支也會發佈，方便合併前先在 Pages 上實測
+      - claude/game-machine-ui-logic-0ppg20
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# 同時只跑一個部署；新的推送不打斷正在跑的那次
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/configure-pages@v5
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: .
+
+      - id: deployment
+        uses: actions/deploy-pages@v4

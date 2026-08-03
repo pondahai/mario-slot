@@ -2,8 +2,40 @@
 
 把原始的機台排版圖當成遊戲畫面，七段顯示器、跑燈、按鍵全部做成可以玩的功能。
 
-開啟方式：用瀏覽器打開 `index.html` 即可（純靜態，不需要伺服器；若瀏覽器擋
-`file://` 的圖片，起一個 `python3 -m http.server` 也行）。
+---
+
+## 怎麼跑
+
+**不需要 GitHub Pages 也能玩。** 整份是純靜態、沒有任何 `fetch`／XHR，
+圖片走的是相對路徑的 `<img>`，所以直接用瀏覽器打開就好：
+
+```
+# 最簡單：雙擊 index.html，或
+open index.html          # macOS
+xdg-open index.html      # Linux
+```
+
+（已用 `file://` 實測：四張圖都載入、24 格跑燈與 14 顆按鍵都建立、console 無錯誤。）
+
+想用本機伺服器也行：
+
+```
+python3 -m http.server 8000    # 然後開 http://localhost:8000
+```
+
+### GitHub Pages
+
+`.github/workflows/pages.yml` 會把整個 repo 發佈到 Pages，推上去就自動部署。
+第一次要先到 repo 的 **Settings → Pages → Build and deployment → Source**
+選 **GitHub Actions**（這個開關只能在網頁上點，API 沒開放）。設定完之後到
+**Actions** 分頁重跑一次 workflow，網址會長這樣：
+
+```
+https://pondahai.github.io/mario-slot/
+```
+
+workflow 目前設定 `master` 和開發分支 `claude/game-machine-ui-logic-0ppg20`
+推送時都會部署，方便合併前先在 Pages 上實測。合併之後可以把開發分支那行拿掉。
 
 ---
 
