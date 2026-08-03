@@ -148,9 +148,18 @@ const Sound = {
         }
     },
 
+    /** 停掉某個正在播放的長音效（只對用 solo 播的有效）。 */
+    stop(name) {
+        const src = this._live[name];
+        if (!src) return;
+        try { src.stop(); } catch (e) { /* 已經播完了 */ }
+        this._live[name] = null;
+    },
+
     setEnabled(on) {
         this.enabled = on;
         if (on) this.unlock();
+        else Object.keys(this._live).forEach(n => this.stop(n));
         localStorage.setItem('marioSlotSound', on ? '1' : '0');
     },
 
@@ -495,6 +504,7 @@ function wash() {
     if (state.phase === 'spinning' || state.phase === 'reveal') return;
 
     if (state.score > 0) {
+        Sound.stop('win');
         state.credit = Math.min(CONFIG.maxCredit, state.credit + state.score);
         flash(`洗分 ${state.score} 分`);
         state.score = 0;
@@ -607,6 +617,7 @@ function startSpin() {
     else state.totalIn += stake;
 
     lamps.forEach(l => l.classList.remove('on', 'win'));
+    Sound.stop('win');
     hideBanner();
     render();
 
@@ -662,6 +673,8 @@ function settle(index, stake, charged) {
             showBanner(`開出 ${SYMBOLS[sym].name}　沒押到`);
         }
     }
+
+    if (won > 0) Sound.play('win', { solo: true });
 
     won = Math.min(won, CONFIG.maxScore);
     state.score = won;

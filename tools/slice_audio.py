@@ -282,7 +282,10 @@ def read_cues(path):
             name, start, end = parts[0], parse_time(parts[1]), parse_time(parts[2])
             if end <= start:
                 sys.exit("第 %d 行的結束時間不在開始之後：%s" % (lineno, line))
-            cues.append((name, start, end))
+            # 第四欄（選填）是淡出毫秒數。切在旋律中間的長片段要拉長淡出，
+            # 不然結尾會斷得很突兀；短音效用預設的 3ms 就好。
+            fade = float(parts[3]) if len(parts) > 3 else None
+            cues.append((name, start, end, fade))
     if not cues:
         sys.exit("cue sheet 裡沒有任何有效的列：" + path)
     return cues
@@ -298,7 +301,7 @@ def cmd_cut(args):
     os.makedirs(CLIP_DIR, exist_ok=True)
     mono = to_mono_wav(args.source, os.path.join(WORK_DIR, "source.wav"))
 
-    for name, start, end in named:
+    for name, start, end, fade in named:
         # ffmpeg 只做頻域的事：低頻隆隆聲、選用的降噪。
         #
         # 去頭尾靜音、淡入淡出、正規化全部在 numpy 做，理由有二：
@@ -313,7 +316,7 @@ def cmd_cut(args):
         dst = os.path.join(CLIP_DIR, name + ".wav")
         run_ffmpeg(["-i", mono, "-ss", "%.3f" % start, "-to", "%.3f" % end,
                     "-af", ",".join(chain), "-ar", str(SR), "-ac", "1", dst])
-        polish_clip(dst, args.trim_threshold, args.peak_db)
+        polish_clip(dst, args.trim_threshold, args.peak_db, fade_out_ms=fade)
         print("  %-14s %6.3fs  %s" % (name, wav_duration(dst), dst))
 
     print("\n切出 %d 段 → %s" % (len(named), CLIP_DIR))
@@ -348,10 +351,11 @@ def trim_silence(samples, sr, threshold_db, pad_ms=6.0):
     return samples[max(0, loud[0] - pad):min(len(samples), loud[-1] + 1 + pad)]
 
 
-def polish_clip(path, trim_db, peak_db, fade_ms=3.0):
-    """去頭尾靜音 → 兩端各 3ms 淡入淡出 → 峰值正規化。
+def polish_clip(path, trim_db, peak_db, fade_ms=3.0, fade_out_ms=None):
+    """去頭尾靜音 → 淡入淡出 → 峰值正規化。
 
     淡出是必要的：切點如果落在波形非零的地方，播放結束會有「喀」的爆音。
+    切在旋律中間的長片段可以用 cue sheet 的第四欄指定較長的淡出。
     正規化用固定增益（不是動態的），所以片段內部的強弱關係完全不變。
     """
     samples, sr = read_wav(path)
@@ -364,9 +368,11 @@ def polish_clip(path, trim_db, peak_db, fade_ms=3.0):
 
     n = min(int(sr * fade_ms / 1000), len(samples) // 2)
     if n > 0:
-        ramp = np.linspace(0.0, 1.0, n, dtype=np.float32)
-        samples[:n] *= ramp
-        samples[-n:] *= ramp[::-1]
+        samples[:n] *= np.linspace(0.0, 1.0, n, dtype=np.float32)
+    m = min(int(sr * (fade_out_ms if fade_out_ms else fade_ms) / 1000),
+            len(samples) - 1)
+    if m > 0:
+        samples[-m:] *= np.linspace(1.0, 0.0, m, dtype=np.float32)
 
     peak = float(np.abs(samples).max())
     if peak > 0:
