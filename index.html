@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>小瑪莉模擬器</title>
+    <!-- 使用數位字體模擬七段顯示器 -->
+    <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    
+    <!-- 控制面板 (編輯模式) -->
+    <div class="admin-panel" id="admin-panel">
+        <h3>🔧 佈景校正模式</h3>
+        <p>請拖曳並縮放紅色框框，將它們對齊底圖上的實際位置！</p>
+        <button id="toggle-edit-btn">開啟編輯模式</button>
+        <button id="save-layout-btn" style="display:none;">儲存位置</button>
+        <button id="reset-layout-btn">重置為預設</button>
+    </div>
+
+    <!-- 遊戲主體 -->
+    <div class="machine-wrapper" id="machine">
+        <img src="34d80fa1-c09c-4050-9b85-a48dfa8796fb.jpg" class="machine-bg" alt="Machine Background">
+        
+        <!-- 七段顯示器 -->
+        <div class="overlay-element display-element" id="credit-disp" data-id="credit">
+            <span class="lcd-text" id="credit-val">1000</span>
+        </div>
+        <div class="overlay-element display-element" id="win-disp" data-id="win">
+            <span class="lcd-text" id="win-val">0</span>
+        </div>
+
+        <!-- 跑燈軌跡 (由 JS 動態產生，方便統一調整位置) -->
+        <div class="overlay-element track-container" id="track-area" data-id="track">
+            <div id="lights-wrapper"></div>
+        </div>
+
+        <!-- 按鍵區 -->
+        <div class="overlay-element btn-element" id="btn-apple" data-id="btn-apple" data-type="bet" data-item="apple"></div>
+        <div class="overlay-element btn-element" id="btn-orange" data-id="btn-orange" data-type="bet" data-item="orange"></div>
+        <div class="overlay-element btn-element" id="btn-mango" data-id="btn-mango" data-type="bet" data-item="mango"></div>
+        <div class="overlay-element btn-element" id="btn-bell" data-id="btn-bell" data-type="bet" data-item="bell"></div>
+        <div class="overlay-element btn-element" id="btn-watermelon" data-id="btn-watermelon" data-type="bet" data-item="watermelon"></div>
+        <div class="overlay-element btn-element" id="btn-star" data-id="btn-star" data-type="bet" data-item="star"></div>
+        <div class="overlay-element btn-element" id="btn-seven" data-id="btn-seven" data-type="bet" data-item="seven"></div>
+        <div class="overlay-element btn-element" id="btn-bar" data-id="btn-bar" data-type="bet" data-item="bar"></div>
+        
+        <div class="overlay-element btn-element" id="btn-start" data-id="btn-start" data-type="control"></div>
+        <div class="overlay-element btn-element" id="btn-reset" data-id="btn-reset" data-type="control"></div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>

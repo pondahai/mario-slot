@@ -1,0 +1,161 @@
+:root {
+    --edit-border: 2px dashed red;
+    --edit-bg: rgba(255, 0, 0, 0.2);
+}
+
+body {
+    margin: 0;
+    padding: 0;
+    background-color: #111;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    font-family: sans-serif;
+    color: white;
+}
+
+.admin-panel {
+    background: #222;
+    padding: 15px;
+    width: 100%;
+    text-align: center;
+    border-bottom: 2px solid #444;
+    z-index: 100;
+}
+
+.admin-panel button {
+    padding: 8px 15px;
+    margin: 5px;
+    cursor: pointer;
+    font-weight: bold;
+}
+
+.machine-wrapper {
+    position: relative;
+    width: 1024px;
+    max-width: 100vw;
+    /* Aspect ratio fallback for responsiveness */
+    aspect-ratio: 1024 / 909;
+    margin-top: 20px;
+    overflow: hidden; /* Contains the dragging elements */
+    box-shadow: 0 0 20px rgba(0,0,0,0.8);
+}
+
+.machine-bg {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    position: absolute;
+    top: 0; left: 0;
+    z-index: 0;
+}
+
+/* Base style for all interactable/configurable elements */
+.overlay-element {
+    position: absolute;
+    z-index: 10;
+    box-sizing: border-box;
+}
+
+/* Play mode styles */
+body:not(.edit-mode) .overlay-element {
+    /* Button areas are invisible but clickable in play mode */
+}
+
+body:not(.edit-mode) .btn-element {
+    cursor: pointer;
+}
+
+body:not(.edit-mode) .btn-element:active {
+    background: rgba(255, 255, 255, 0.3);
+}
+
+/* Displays */
+.display-element {
+    display: flex;
+    justify-content: flex-end;
+    align-items: center;
+    padding: 0 10px;
+}
+
+.lcd-text {
+    font-family: 'Share Tech Mono', monospace;
+    color: red;
+    font-size: 2vw; /* responsive size, will be handled by JS or CSS */
+    text-shadow: 0 0 5px red;
+    letter-spacing: 2px;
+}
+
+/* Track Lights Area */
+.track-container {
+    pointer-events: none; /* Let clicks pass through */
+}
+
+#lights-wrapper {
+    position: relative;
+    width: 100%;
+    height: 100%;
+}
+
+.track-light {
+    position: absolute;
+    box-sizing: border-box;
+    transition: background 0.1s;
+}
+
+.track-light.active {
+    background: rgba(255, 255, 255, 0.7);
+    box-shadow: 0 0 15px 5px rgba(255, 255, 255, 0.8), inset 0 0 10px white;
+    border: 2px solid white;
+    border-radius: 4px;
+}
+
+/* --- Edit Mode Styles --- */
+body.edit-mode .overlay-element {
+    border: var(--edit-border);
+    background: var(--edit-bg);
+    cursor: move;
+}
+
+body.edit-mode .overlay-element::after {
+    content: attr(data-id);
+    position: absolute;
+    top: 0; left: 0;
+    background: red;
+    color: white;
+    font-size: 12px;
+    padding: 2px 4px;
+    pointer-events: none;
+}
+
+/* Resizer Handle */
+.resizer {
+    width: 15px;
+    height: 15px;
+    background: yellow;
+    position: absolute;
+    right: 0;
+    bottom: 0;
+    cursor: se-resize;
+}
+
+body:not(.edit-mode) .resizer {
+    display: none;
+}
+
+/* Default Initial Positions (percentages so it scales with wrapper) */
+#credit-disp { top: 10%; left: 30%; width: 15%; height: 5%; }
+#win-disp { top: 10%; left: 55%; width: 15%; height: 5%; }
+#track-area { top: 20%; left: 25%; width: 50%; height: 50%; }
+
+/* Default buttons */
+#btn-apple { top: 75%; left: 10%; width: 8%; height: 8%; }
+#btn-orange { top: 75%; left: 20%; width: 8%; height: 8%; }
+#btn-mango { top: 75%; left: 30%; width: 8%; height: 8%; }
+#btn-bell { top: 75%; left: 40%; width: 8%; height: 8%; }
+#btn-watermelon { top: 75%; left: 50%; width: 8%; height: 8%; }
+#btn-star { top: 75%; left: 60%; width: 8%; height: 8%; }
+#btn-seven { top: 75%; left: 70%; width: 8%; height: 8%; }
+#btn-bar { top: 75%; left: 80%; width: 8%; height: 8%; }
+#btn-start { top: 85%; left: 70%; width: 10%; height: 8%; }
+#btn-reset { top: 85%; left: 20%; width: 10%; height: 8%; }
