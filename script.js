@@ -504,6 +504,7 @@ function wash() {
     if (state.phase === 'spinning' || state.phase === 'reveal') return;
 
     if (state.score > 0) {
+        clearWinFx();
         Sound.stop('win');
         state.credit = Math.min(CONFIG.maxCredit, state.credit + state.score);
         flash(`洗分 ${state.score} 分`);
@@ -616,7 +617,8 @@ function startSpin() {
     if (free) state.pendingSpecial -= 1;
     else state.totalIn += stake;
 
-    lamps.forEach(l => l.classList.remove('on', 'win'));
+    lamps.forEach(l => l.classList.remove('on', 'landed', 'win'));
+    clearWinFx();
     Sound.stop('win');
     hideBanner();
     render();
@@ -647,12 +649,14 @@ function startSpin() {
 
 function settle(index, stake, charged) {
     const sym = BOARD[index];
-    lamps[index].classList.add('win');
+    // landed = 跑燈停在這裡（不管有沒有中），win = 真的中了才閃
+    lamps[index].classList.add('landed');
 
     if (sym === 'special') {
         state.pendingSpecial += 1;
         updateController(charged, 0);
         state.phase = 'idle';
+        lamps[index].classList.add('win');
         showBanner('特別　押注保留　免費再開一次');
         render();
         return;
@@ -674,7 +678,10 @@ function settle(index, stake, charged) {
         }
     }
 
-    if (won > 0) Sound.play('win', { solo: true });
+    if (won > 0) {
+        lamps[index].classList.add('win');
+        Sound.play('win', { solo: true });
+    }
 
     won = Math.min(won, CONFIG.maxScore);
     state.score = won;
@@ -786,9 +793,13 @@ function setKey(id, enabled, live) {
 
 function markIcon(sym) {
     const m = iconMarks[sym];
-    if (!m) return;
-    m.classList.add('on');
-    setTimeout(() => m.classList.remove('on'), 2200);
+    if (m) m.classList.add('on');
+}
+
+/** 收掉中獎的閃爍（盤面那格 + 鍵盤上的圖案）。停格的靜態亮不動。 */
+function clearWinFx() {
+    lamps.forEach(l => l.classList.remove('win'));
+    Object.values(iconMarks).forEach(m => m.classList.remove('on'));
 }
 
 let bannerTimer = null;

@@ -184,12 +184,34 @@ body {
     outline-offset: -2px;
 }
 
-.lamp.win {
+/* 跑燈停下來的那一格：靜態亮著，不管有沒有中獎 */
+.lamp.landed {
     background: radial-gradient(closest-side, rgba(255, 255, 255, .8), rgba(255, 210, 60, .5));
     box-shadow: 0 0 26px 10px rgba(255, 225, 120, 1),
                 inset 0 0 16px rgba(255, 255, 255, .95);
     outline: 3px solid #fff6cf;
     outline-offset: -3px;
+}
+
+/* 中獎的那一格會閃，跟真機一樣。閃到下一局開始或按洗分為止。
+   關掉 transition 才閃得乾脆 —— .lamp 本身有 .08s 的漸變會把方波磨圓。 */
+.lamp.win {
+    transition: none;
+    animation: lamp-win .34s steps(1, end) infinite;
+}
+
+@keyframes lamp-win {
+    0%, 55% {
+        background: radial-gradient(closest-side, rgba(255, 255, 255, .9), rgba(255, 210, 60, .6));
+        box-shadow: 0 0 30px 12px rgba(255, 230, 130, 1),
+                    inset 0 0 18px rgba(255, 255, 255, 1);
+        outline: 3px solid #fff6cf;
+    }
+    55.01%, 100% {
+        background: transparent;
+        box-shadow: none;
+        outline: 2px solid rgba(255, 235, 160, .22);
+    }
 }
 
 /* ── 中獎橫幅 ───────────────────────────────────────────── */
@@ -262,17 +284,32 @@ body {
 }
 .key-bet .amt:empty::before { content: ""; }
 
-/* 中獎圖案在鍵盤上的對應圖示會閃一下 */
+/* 中獎圖案在鍵盤上的對應圖示，跟盤面那格同步閃 */
 .icon-mark {
     position: absolute;
     border-radius: 3px;
     pointer-events: none;
     opacity: 0;
-    transition: opacity .15s;
 }
 .icon-mark.on {
-    opacity: 1;
-    box-shadow: 0 0 0 3px #fff3c4, 0 0 18px 6px rgba(255, 200, 70, .9);
+    animation: icon-win .34s steps(1, end) infinite;
+}
+
+@keyframes icon-win {
+    0%, 55%     { opacity: 1; box-shadow: 0 0 0 3px #fff3c4, 0 0 18px 6px rgba(255, 200, 70, .9); }
+    55.01%, 100% { opacity: 0; box-shadow: none; }
+}
+
+/* 會暈眩的使用者：改成不閃的持續高亮 */
+@media (prefers-reduced-motion: reduce) {
+    .lamp.win, .icon-mark.on { animation: none; }
+    .lamp.win {
+        background: radial-gradient(closest-side, rgba(255, 255, 255, .9), rgba(255, 210, 60, .6));
+        box-shadow: 0 0 30px 12px rgba(255, 230, 130, 1);
+        outline: 3px solid #fff6cf;
+    }
+    .icon-mark.on { opacity: 1; box-shadow: 0 0 0 3px #fff3c4, 0 0 18px 6px rgba(255, 200, 70, .9); }
+    .bet-meter.armed, .key.live { animation: none; }
 }
 
 /* 校正模式：把所有感應區畫出來 */
