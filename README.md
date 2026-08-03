@@ -34,8 +34,8 @@ python3 -m http.server 8000    # 然後開 http://localhost:8000
 https://pondahai.github.io/mario-slot/
 ```
 
-workflow 目前設定 `master` 和開發分支 `claude/game-machine-ui-logic-0ppg20`
-推送時都會部署，方便合併前先在 Pages 上實測。合併之後可以把開發分支那行拿掉。
+只有推到 `master` 才會部署。需要從其他分支先試的話，到 **Actions** 分頁手動
+執行這個 workflow（`workflow_dispatch`）並挑分支。
 
 ---
 

@@ -6,8 +6,7 @@ on:
   push:
     branches:
       - master
-      # 這個開發分支也會發佈，方便合併前先在 Pages 上實測
-      - claude/game-machine-ui-logic-0ppg20
+  # 需要從其他分支手動部署時，到 Actions 分頁挑分支執行
   workflow_dispatch:
 
 permissions:
