@@ -3,7 +3,11 @@
 # audio/src/  原始錄音。這個 repo 是公開的，而且 gh-pages 會把所有檔案發佈成
 #             可直接下載的網址，所以原始音軌一律留在本機，不要 commit。
 #             要重跑切割就把素材放回這個資料夾。
-# audio/work/ 切割過程的中介檔（來源 wav、試聽片段、波形圖），
-#             都能用 tools/slice_audio.py 重新產生。
+# audio/work/ 切割過程的中介檔（來源 wav、試聽片段、波形圖）。
+# audio/clips/ 切出來的單一音效，同樣是原始錄音的一部分，不公開。
+#
+# 有進版控的是 audio/cues/*.tsv（時間軸標記，純文字、沒有音訊）與最終打包好的
+# assets/audio/ —— 也就是「配方」和「成品」進版控，「原料」留在本機。
 audio/src/
 audio/work/
+audio/clips/

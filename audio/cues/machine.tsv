@@ -1,0 +1,20 @@
+# 切割規則：從原始錄音切出音效的時間軸
+#
+# 這份檔案是「配方」—— 跟 slice_assets.py 裡的像素座標同性質，是人工聽出來的
+# 成果，必須進版控。音檔本身不進版控（見 .gitignore）。
+#
+# 重跑：把原始錄音放回 audio/src/，然後
+#   python3 tools/slice_audio.py cut audio/src/machine.mp3 --cues audio/cues/machine.tsv
+#
+# 時間由使用者聽辨標定；bet 的起點從聽感的 19.3 修正到 19.535，
+# 因為 19.30–19.54 只有背景音樂、沒有按鍵聲。
+#
+# name	start	end
+coin	17.280	18.560
+bet	19.535	19.960
+tick1	24.561	24.598
+tick2	24.598	24.635
+tick3	24.635	24.672
+tick4	24.672	24.709
+run_slow	22.560	23.700
+bgm	27.800	34.000
