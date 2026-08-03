@@ -25,25 +25,22 @@ python3 -m http.server 8000    # 然後開 http://localhost:8000
 
 ### GitHub Pages
 
-`.github/workflows/pages.yml` 會把整個 repo 發佈到 Pages，推到 `master` 就自動部署。
+線上版：**https://pondahai.github.io/mario-slot/**
 
-**第一次要人工開一次 Pages**，只有這一步躲不掉：
+用的是傳統的 `gh-pages` 分支：public repo 只要出現 `gh-pages` 分支，GitHub 就會
+自動開啟 Pages 並發佈，**不需要到 Settings 點任何東西、也不需要 Actions**。
 
-> repo → **Settings → Pages → Build and deployment → Source** → 選 **GitHub Actions**
-
-（試過用 `actions/configure-pages` 的 `enablement: true` 讓 workflow 自己開，
-會失敗在 `Create Pages site failed: Resource not accessible by integration` ——
-`GITHUB_TOKEN` 即使有 `pages: write` 也只能部署到已存在的站台，建立站台要 repo
-admin 權限。要全自動就得另外準備一組有 admin 的 PAT 傳給 action。）
-
-開好之後到 **Actions** 分頁重跑一次 workflow，網址：
+改完東西之後要更新線上版，就把 `master` 推到 `gh-pages`：
 
 ```
-https://pondahai.github.io/mario-slot/
+git push origin master:gh-pages
 ```
 
-只有推到 `master` 才會部署。需要從其他分支先試的話，到 **Actions** 分頁手動
-執行這個 workflow（`workflow_dispatch`）並挑分支。
+> 註：本來試過用 GitHub Actions 部署（`actions/deploy-pages`），行不通 ——
+> 那條路要求 Pages 站台已經存在，而 workflow 的 `GITHUB_TOKEN` 就算給了
+> `pages: write` 也沒有權限建立站台（`Resource not accessible by integration`），
+> 等於一定得先人工去 Settings 點一次。`gh-pages` 分支沒有這個問題，所以
+> 那個 workflow 已經移除。
 
 ---
 
