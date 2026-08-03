@@ -3,53 +3,101 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>小瑪莉模擬器</title>
-    <!-- 使用數位字體模擬七段顯示器 -->
-    <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&display=swap" rel="stylesheet">
+    <title>小瑪莉 水果盤 模擬器</title>
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='5' fill='%231d1512'/%3E%3Ccircle cx='16' cy='18' r='8' fill='%23e23b2e'/%3E%3Cpath d='M16 10c0-3 2-5 5-5-1 3-2 5-5 5z' fill='%232e9e4a'/%3E%3C/svg%3E">
     <link rel="stylesheet" href="styles.css">
 </head>
 <body>
-    
-    <!-- 控制面板 (編輯模式) -->
-    <div class="admin-panel" id="admin-panel">
-        <h3>🔧 佈景校正模式</h3>
-        <p>請拖曳並縮放紅色框框，將它們對齊底圖上的實際位置！</p>
-        <button id="toggle-edit-btn">開啟編輯模式</button>
-        <button id="save-layout-btn" style="display:none;">儲存位置</button>
-        <button id="reset-layout-btn">重置為預設</button>
+
+<div class="stage">
+    <!-- 機台：由原圖切出的四個零件重新排版，按鍵盤已搬到面板正下方、與輪盤對齊 -->
+    <div class="cabinet" id="cabinet">
+
+        <!-- ── 主面板：輪盤 + 七段顯示器 ── -->
+        <div class="piece piece-board">
+            <img src="assets/board.png" alt="小瑪莉面板" draggable="false">
+
+            <!-- 蓋掉原圖上糊掉的印刷字，換成看得懂的標示 -->
+            <div class="plate-label" id="label-credit">分　數</div>
+            <div class="plate-label" id="label-score">得　分</div>
+
+            <!-- 七段顯示器（由 JS 填入 SVG 數字） -->
+            <div class="seg-display" id="disp-credit" data-digits="4" title="分數 CREDIT"></div>
+            <div class="seg-display" id="disp-score" data-digits="4" title="得分 SCORE"></div>
+            <div class="seg-display" id="disp-center" data-digits="2" title="比倍號碼 / 特別次數"></div>
+
+            <!-- 輪盤 24 格跑燈（JS 產生） -->
+            <div class="lamp-layer" id="lamp-layer"></div>
+
+            <!-- 盤面下方 8 個押注計數器（JS 產生） -->
+            <div class="bet-meters" id="bet-meters"></div>
+
+            <!-- 中獎 / 特別 / 彩金 提示 -->
+            <div class="banner" id="banner" aria-live="polite"></div>
+        </div>
+
+        <!-- ── 投幣器：點一下投一枚 10 元 ── -->
+        <button class="piece piece-coin" id="coin-slot" title="投幣（10 元 = 10 分）　快捷鍵 C">
+            <img src="assets/coin.png" alt="投幣器" draggable="false">
+            <span class="coin-hint">投幣</span>
+        </button>
+
+        <!-- ── 賠率牌 ── -->
+        <div class="piece piece-sign">
+            <img src="assets/sign.png" alt="賠率牌" draggable="false">
+        </div>
+
+        <!-- ── 按鍵盤：已與輪盤中心對齊 ── -->
+        <div class="piece piece-panel">
+            <img src="assets/panel.png" alt="按鍵盤" draggable="false">
+            <div class="key-layer" id="key-layer"></div>
+        </div>
     </div>
 
-    <!-- 遊戲主體 -->
-    <div class="machine-wrapper" id="machine">
-        <img src="34d80fa1-c09c-4050-9b85-a48dfa8796fb.jpg" class="machine-bg" alt="Machine Background">
-        
-        <!-- 七段顯示器 -->
-        <div class="overlay-element display-element" id="credit-disp" data-id="credit">
-            <span class="lcd-text" id="credit-val">1000</span>
-        </div>
-        <div class="overlay-element display-element" id="win-disp" data-id="win">
-            <span class="lcd-text" id="win-val">0</span>
-        </div>
+    <!-- ── 側邊資訊 ── -->
+    <aside class="hud">
+        <h1>小瑪莉 <small>水果盤模擬器</small></h1>
 
-        <!-- 跑燈軌跡 (由 JS 動態產生，方便統一調整位置) -->
-        <div class="overlay-element track-container" id="track-area" data-id="track">
-            <div id="lights-wrapper"></div>
-        </div>
+        <section>
+            <h2>賠率表</h2>
+            <table class="odds" id="odds-table"></table>
+            <p class="note">盤面 24 格：可押圖案 20 格 + 特別 2 格 + 彩金 2 格。</p>
+        </section>
 
-        <!-- 按鍵區 -->
-        <div class="overlay-element btn-element" id="btn-apple" data-id="btn-apple" data-type="bet" data-item="apple"></div>
-        <div class="overlay-element btn-element" id="btn-orange" data-id="btn-orange" data-type="bet" data-item="orange"></div>
-        <div class="overlay-element btn-element" id="btn-mango" data-id="btn-mango" data-type="bet" data-item="mango"></div>
-        <div class="overlay-element btn-element" id="btn-bell" data-id="btn-bell" data-type="bet" data-item="bell"></div>
-        <div class="overlay-element btn-element" id="btn-watermelon" data-id="btn-watermelon" data-type="bet" data-item="watermelon"></div>
-        <div class="overlay-element btn-element" id="btn-star" data-id="btn-star" data-type="bet" data-item="star"></div>
-        <div class="overlay-element btn-element" id="btn-seven" data-id="btn-seven" data-type="bet" data-item="seven"></div>
-        <div class="overlay-element btn-element" id="btn-bar" data-id="btn-bar" data-type="bet" data-item="bar"></div>
-        
-        <div class="overlay-element btn-element" id="btn-start" data-id="btn-start" data-type="control"></div>
-        <div class="overlay-element btn-element" id="btn-reset" data-id="btn-reset" data-type="control"></div>
-    </div>
+        <section>
+            <h2>操作</h2>
+            <dl class="keys">
+                <dt>投幣器</dt><dd>投一枚 10 元 ＝ 10 分<kbd>C</kbd></dd>
+                <dt>圖案鍵 ×8</dt><dd>按一下押 1 分，單一圖案上限 99 分<kbd>1</kbd>…<kbd>8</kbd></dd>
+                <dt>全押</dt><dd>八個圖案各押 1 分（需 8 分）<kbd>W</kbd></dd>
+                <dt>開始</dt><dd>開始跑燈開獎<kbd>空白</kbd></dd>
+                <dt>比倍</dt><dd>得分不為 0 時進入比大小<kbd>D</kbd></dd>
+                <dt>小 / 大</dt><dd>比倍時猜 1–7 或 8–14<kbd>A</kbd><kbd>S</kbd></dd>
+                <dt>洗分</dt><dd>得分收進分數；得分為 0 時退幣<kbd>Q</kbd></dd>
+            </dl>
+        </section>
 
-    <script src="script.js"></script>
+        <section>
+            <h2>玩法</h2>
+            <ol class="rules">
+                <li>投幣取得分數，用下排八個圖案鍵下注，押注分數顯示在盤面下方的計數器。</li>
+                <li>按「開始」後跑燈繞盤，停在哪一格就開哪一格。</li>
+                <li>停在你有押注的圖案 → 得分 ＝ 押注 × 賠率。</li>
+                <li>停在「特別」→ 押注全部保留，免費再開一次。</li>
+                <li>停在「彩金」→ 不看押注圖案，直接給 押注總額 × 10。</li>
+                <li>有得分時可以「比倍」猜大小，猜中 ×2、猜錯歸零，最多連比 10 次。</li>
+                <li>不想比倍就按「洗分」把得分收進分數。</li>
+            </ol>
+        </section>
+
+        <section>
+            <h2>機台設定</h2>
+            <p class="note" id="rtp-note"></p>
+            <label class="toggle"><input type="checkbox" id="debug-toggle"> 顯示感應區（校正用）</label>
+        </section>
+    </aside>
+</div>
+
+<script src="script.js"></script>
 </body>
 </html>
