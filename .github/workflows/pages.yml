@@ -28,11 +28,12 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # enablement: true 會直接用 API 把 Pages 開起來（build_type 設成 workflow），
-      # 不需要先去 Settings → Pages 手動選 Source。靠上面的 pages: write 權限。
+      # 試過 enablement: true（想讓 action 自己把 Pages 開起來），不行：
+      #   Create Pages site failed. Error: Resource not accessible by integration
+      # GITHUB_TOKEN 就算有 pages: write，也只能部署到「已存在」的 Pages 站台；
+      # 建立站台要 repo admin 權限，內建 token 拿不到。所以第一次一定要人工去
+      # Settings → Pages → Source 選 GitHub Actions（或改傳一組有 admin 的 PAT）。
       - uses: actions/configure-pages@v5
-        with:
-          enablement: true
 
       - uses: actions/upload-pages-artifact@v3
         with:

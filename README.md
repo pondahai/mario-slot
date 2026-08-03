@@ -25,9 +25,18 @@ python3 -m http.server 8000    # 然後開 http://localhost:8000
 
 ### GitHub Pages
 
-`.github/workflows/pages.yml` 會把整個 repo 發佈到 Pages，推上去就自動部署，
-**不需要手動去 Settings 設定** —— `actions/configure-pages` 帶了 `enablement: true`，
-第一次跑的時候會自己用 API 把 Pages 開起來。網址：
+`.github/workflows/pages.yml` 會把整個 repo 發佈到 Pages，推到 `master` 就自動部署。
+
+**第一次要人工開一次 Pages**，只有這一步躲不掉：
+
+> repo → **Settings → Pages → Build and deployment → Source** → 選 **GitHub Actions**
+
+（試過用 `actions/configure-pages` 的 `enablement: true` 讓 workflow 自己開，
+會失敗在 `Create Pages site failed: Resource not accessible by integration` ——
+`GITHUB_TOKEN` 即使有 `pages: write` 也只能部署到已存在的站台，建立站台要 repo
+admin 權限。要全自動就得另外準備一組有 admin 的 PAT 傳給 action。）
+
+開好之後到 **Actions** 分頁重跑一次 workflow，網址：
 
 ```
 https://pondahai.github.io/mario-slot/
