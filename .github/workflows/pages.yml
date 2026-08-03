@@ -28,7 +28,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # enablement: true 會直接用 API 把 Pages 開起來（build_type 設成 workflow），
+      # 不需要先去 Settings → Pages 手動選 Source。靠上面的 pages: write 權限。
       - uses: actions/configure-pages@v5
+        with:
+          enablement: true
 
       - uses: actions/upload-pages-artifact@v3
         with:

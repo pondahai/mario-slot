@@ -25,10 +25,9 @@ python3 -m http.server 8000    # 然後開 http://localhost:8000
 
 ### GitHub Pages
 
-`.github/workflows/pages.yml` 會把整個 repo 發佈到 Pages，推上去就自動部署。
-第一次要先到 repo 的 **Settings → Pages → Build and deployment → Source**
-選 **GitHub Actions**（這個開關只能在網頁上點，API 沒開放）。設定完之後到
-**Actions** 分頁重跑一次 workflow，網址會長這樣：
+`.github/workflows/pages.yml` 會把整個 repo 發佈到 Pages，推上去就自動部署，
+**不需要手動去 Settings 設定** —— `actions/configure-pages` 帶了 `enablement: true`，
+第一次跑的時候會自己用 API 把 Pages 開起來。網址：
 
 ```
 https://pondahai.github.io/mario-slot/
