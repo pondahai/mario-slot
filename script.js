@@ -307,6 +307,79 @@ const state = {
     totalOut: 0,          // 累計得分
 };
 
+/* ── 存檔 ──────────────────────────────────────────────────
+
+   關掉分頁再回來，機台應該還在原本的樣子 —— 分數、押注、累積的「特別」，
+   還有吃分／吐分控制器的積分狀態（gamma）和累計統計。控制器的狀態一定要
+   一起存：只存分數的話，重開等於把機台的記憶洗掉，玩家隨時能靠重整
+   把返還率控制器歸零。
+
+   跑燈中（spinning）和比倍開號碼中（reveal）是動畫的中間狀態，不存檔；
+   萬一在這時候關掉，回來時會退回上一個穩定狀態（押注還在，該局沒發生）。 */
+
+const SAVE_KEY = 'marioSlotSave';
+const SAVE_VERSION = 1;
+
+function saveState() {
+    if (state.phase === 'spinning' || state.phase === 'reveal') return;
+    try {
+        localStorage.setItem(SAVE_KEY, JSON.stringify({
+            v: SAVE_VERSION,
+            credit: state.credit,
+            score: state.score,
+            bets: state.bets,
+            // 比倍途中關掉，回來時停在「有得分」的狀態，讓玩家自己決定要不要再比
+            phase: state.phase === 'double' ? 'won' : state.phase,
+            pos: state.pos,
+            doubleCount: state.doubleCount,
+            pendingSpecial: state.pendingSpecial,
+            gamma: state.gamma,
+            stakeRef: state.stakeRef,
+            totalIn: state.totalIn,
+            totalOut: state.totalOut,
+        }));
+    } catch (e) {
+        // 無痕模式或空間不足：存不了就算了，遊戲照常能玩
+    }
+}
+
+/** 讀回存檔並套進 state。回傳有沒有讀到。 */
+function loadState() {
+    let saved;
+    try {
+        const raw = localStorage.getItem(SAVE_KEY);
+        if (!raw) return false;
+        saved = JSON.parse(raw);
+    } catch (e) {
+        return false;
+    }
+    if (!saved || saved.v !== SAVE_VERSION) return false;
+
+    const num = (v, min, max, dflt) =>
+        (typeof v === 'number' && isFinite(v)) ? Math.min(max, Math.max(min, v)) : dflt;
+
+    state.credit = Math.round(num(saved.credit, 0, CONFIG.maxCredit, 0));
+    state.score = Math.round(num(saved.score, 0, CONFIG.maxScore, 0));
+    state.pos = Math.round(num(saved.pos, 0, 23, 0));
+    state.doubleCount = Math.round(num(saved.doubleCount, 0, CONFIG.maxDoubleUps, 0));
+    state.pendingSpecial = Math.round(num(saved.pendingSpecial, 0, 99, 0));
+    state.gamma = num(saved.gamma, -50, 50, -1.5);
+    state.stakeRef = num(saved.stakeRef, 1, 1e9, 8);
+    state.totalIn = num(saved.totalIn, 0, 1e12, 0);
+    state.totalOut = num(saved.totalOut, 0, 1e12, 0);
+
+    const bets = saved.bets || {};
+    BET_ORDER.forEach(s => {
+        state.bets[s] = Math.round(num(bets[s], 0, CONFIG.maxBetPerSymbol, 0));
+    });
+
+    // 只有「有得分待處理」才需要留在 won，其餘一律回到可以下注的 idle
+    state.phase = (saved.phase === 'won' && state.score > 0) ? 'won' : 'idle';
+    if (state.phase === 'idle') state.doubleCount = 0;   // 比倍次數只在同一筆得分內累計
+
+    return true;
+}
+
 const el = {};
 const lamps = [];
 const meters = [];
@@ -335,7 +408,17 @@ document.addEventListener('DOMContentLoaded', () => {
         `返還率設定 ${(CONFIG.targetRTP * 100).toFixed(0)}%。跑燈結果由機率控制器決定，` +
         `會依照累計投注／得分把實際返還率拉回設定值 —— 真實機台也是這樣「吃分吐分」的。`;
 
-    state.credit = 100;   // 開機先送 100 分，免得一開始只能盯著投幣器
+    const resumed = loadState();
+    if (!resumed) state.credit = 100;   // 第一次開機先送 100 分，免得只能盯著投幣器
+
+    // 跑燈停在上次的位置，看得出來機台是接著上一局繼續
+    lamps[state.pos].classList.add('landed');
+    if (resumed) {
+        showBanner(state.score > 0
+            ? `接續上次　分數 ${state.credit}　得分 ${state.score}`
+            : `接續上次　分數 ${state.credit}`);
+    }
+
     render();
 });
 
@@ -783,6 +866,9 @@ function render() {
     setKey('wash', !busy && (state.score > 0 || (idle && state.credit > 0)), won);
 
     document.getElementById('coin-slot').disabled = busy;
+
+    // render() 是所有狀態變動的共同出口，存檔掛在這裡就不會漏
+    saveState();
 }
 
 function setKey(id, enabled, live) {
