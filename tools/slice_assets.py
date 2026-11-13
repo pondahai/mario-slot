@@ -1,15 +1,16 @@
 #!/usr/bin/env python3
-"""切割原始機台圖，把四個零件拆成獨立的 PNG。
+"""Cắt ảnh máy gốc, tách bốn chi tiết thành các PNG riêng.
 
-原圖 (34d80fa1-....jpg) 是一張「零件排版圖」：機台面板、投幣器、賠率牌、
-按鍵盤各自散落在白紙上。遊戲需要把按鍵盤搬到面板正下方、與輪盤對齊，
-所以必須先把零件切開。
+Ảnh gốc (34d80fa1-....jpg) là một "ảnh sắp xếp chi tiết": bảng máy, khe xu,
+bảng tỷ lệ và bàn phím nút bấm nằm rải rác trên nền giấy trắng. Trò chơi cần
+đưa bàn phím xuống ngay dưới bảng và thẳng hàng với vòng quay, nên phải cắt
+các chi tiết ra trước.
 
-執行： python3 tools/slice_assets.py
-輸出： assets/board.png / coin.png / sign.png / panel.png
+Chạy:   python3 tools/slice_assets.py
+Đầu ra: assets/board.png / coin.png / sign.png / panel.png
 
-四個 bounding box 是用背景色差 (紙張底色 ~#eeeeec) 的 row/column profile
-量出來的，數值寫死在這裡，重跑會得到完全一樣的結果。
+Bốn bounding box được đo từ profile chênh lệch màu nền (nền giấy ~#eeeeec)
+theo hàng/cột, giá trị cố định trong code nên chạy lại sẽ ra kết quả giống hệt.
 """
 
 import os
@@ -21,30 +22,30 @@ from PIL import Image, ImageDraw
 SRC = "34d80fa1-c09c-4050-9b85-a48dfa8796fb.jpg"
 OUT_DIR = "assets"
 
-# (left, top, right, bottom) — 以原圖 1024x909 的像素為單位
+# (left, top, right, bottom) — theo pixel của ảnh gốc 1024x909
 PIECES = {
-    "board": (199, 72, 665, 621),   # 主面板：跑燈輪盤 + 七段顯示器
-    "coin": (707, 82, 819, 297),    # 投幣器
-    "sign": (689, 337, 833, 564),   # 賠率牌
-    "panel": (460, 656, 840, 843),  # 按鍵盤
+    "board": (199, 72, 665, 621),   # Bảng chính: vòng quay đèn chạy + màn LED 7 đoạn
+    "coin": (707, 82, 819, 297),    # Khe đút xu
+    "sign": (689, 337, 833, 564),   # Bảng tỷ lệ thưởng
+    "panel": (460, 656, 840, 843),  # Bàn phím nút bấm
 }
 
-# 紙張底色，以及判定「這格是背景」的容差
+# Màu nền giấy và ngưỡng sai số để nhận diện "ô này là nền"
 BG = (238, 238, 236)
 TOL = 26
 
-# 原圖上的七段顯示器印著固定的數字（40 / 92 / 0 / 2）。遊戲要自己畫數字，
-# 所以先把這些視窗塗成 LED 熄滅時的暗紅底，免得原本的字從筆劃縫隙透出來。
-# 座標同樣是 board 零件內的像素，數值與 styles.css 裡的百分比一一對應。
+# Trên ảnh gốc, màn LED 7 đoạn in sẵn các số cố định (40 / 92 / 0 / 2). Trò chơi tự vẽ số,
+# nên các cửa sổ này được tô thành màu đỏ sẫm của LED đã tắt, tránh chữ gốc lọt qua khe nét.
+# Tọa độ tính theo pixel trong chi tiết board; giá trị khớp 1-1 với tỷ lệ phần trăm trong styles.css.
 LED_DARK = (74, 14, 13)
 _METER_X0, _METER_PITCH = 51, 46.75
 
 LED_WINDOWS = [
-    (122, 51, 206, 90),    # 分數（左上四位）
-    (259, 51, 344, 90),    # 得分（右上四位）
-    (208, 300, 261, 340),  # 中央兩位（比倍號碼 / 特別次數）
+    (122, 51, 206, 90),    # Điểm (bốn chữ số bên trái trên)
+    (259, 51, 344, 90),    # Điểm thắng (bốn chữ số bên phải trên)
+    (208, 300, 261, 340),  # Hai chữ số giữa (số gấp đôi / số lần đặc biệt)
 ] + [
-    # 盤面下方 8 個押注計數器
+    # 8 bộ đếm cược bên dưới bảng
     (int(_METER_X0 + i * _METER_PITCH), 479,
      int(_METER_X0 + i * _METER_PITCH) + 41, 513)
     for i in range(8)
@@ -52,10 +53,11 @@ LED_WINDOWS = [
 
 
 def cut_background(img):
-    """從四邊 flood fill，把外圍紙張底色挖成透明。
+    """Flood fill từ bốn cạnh, xóa màu nền giấy thành trong suốt.
 
-    只從邊界往內擴散，所以零件內部的淺色（例如面板的米白磁磚）不會被誤殺，
-    圓角外那一圈紙張則會乾淨地變透明。
+    Chỉ lan từ biên vào trong, nên màu sáng bên trong chi tiết (ví dụ gạch
+    men trắng ngà của bàn phím) không bị xóa nhầm, còn vùng giấy quanh góc bo
+    tròn sẽ trong suốt sạch sẽ.
     """
     img = img.convert("RGBA")
     w, h = img.size
@@ -91,7 +93,7 @@ def cut_background(img):
 
 
 def blank_led_windows(img):
-    """把七段顯示器視窗塗成熄滅底色，加一點雜訊避免看起來像貼上去的色塊。"""
+    """Tô các cửa sổ LED 7 đoạn thành màu LED tắt, thêm chút nhiễu để không giống mảng màu dán lên."""
     d = ImageDraw.Draw(img)
     rng = random.Random(20240803)
     for box in LED_WINDOWS:

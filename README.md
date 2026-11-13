@@ -1,340 +1,339 @@
-# 小瑪莉 水果盤模擬器
+# Mô phỏng Tiểu Mary (khay trái cây)
 
-### ▶ 線上遊玩：https://pondahai.github.io/mario-slot/
+### ▶ Chơi trực tuyến: https://pondahai.github.io/mario-slot/
 
-把原始的機台排版圖當成遊戲畫面，七段顯示器、跑燈、按鍵全部做成可以玩的功能。
+Lấy ảnh bố cục gốc của máy làm màn hình chơi; màn hình LED 7 đoạn, đèn chạy và các nút bấm đều được làm thành chức năng có thể chơi được.
 
-![小瑪莉水果盤模擬器的畫面：左邊是機台，八個圖案各押了注、跑燈停在西瓜中獎 180 分，右邊是賠率表與操作說明](docs/screenshot.jpg)
+![Ảnh chụp mô phỏng Tiểu Mary: bên trái là máy, tám hình đều có cược, đèn dừng ở dưa hấu trúng 180 điểm; bên phải là bảng tỷ lệ và hướng dẫn thao tác](docs/screenshot.jpg)
 
 ---
 
-## 怎麼跑
+## Cách chạy
 
-**不需要 GitHub Pages 也能玩。** 整份是純靜態、沒有任何 `fetch`／XHR，
-圖片走的是相對路徑的 `<img>`，所以直接用瀏覽器打開就好：
+**Không cần GitHub Pages cũng chơi được.** Toàn bộ là tĩnh thuần túy, không có `fetch`/XHR nào;
+ảnh dùng thẻ `<img>` với đường dẫn tương đối, nên chỉ cần mở trực tiếp bằng trình duyệt:
 
 ```
-# 最簡單：雙擊 index.html，或
+# Cách đơn giản nhất: nhấp đúp index.html, hoặc
 open index.html          # macOS
 xdg-open index.html      # Linux
 ```
 
-（已用 `file://` 實測：四張圖都載入、24 格跑燈與 14 顆按鍵都建立、console 無錯誤。）
+(Đã kiểm thử bằng `file://`: cả bốn ảnh đều tải, 24 ô đèn chạy và 14 nút bấm đều được tạo, console không có lỗi.)
 
-想用本機伺服器也行：
+Muốn dùng máy chủ cục bộ cũng được:
 
 ```
-python3 -m http.server 8000    # 然後開 http://localhost:8000
+python3 -m http.server 8000    # rồi mở http://localhost:8000
 ```
 
 ### GitHub Pages
 
-線上版：**https://pondahai.github.io/mario-slot/**
+Bản trực tuyến: **https://pondahai.github.io/mario-slot/**
 
-用的是傳統的 `gh-pages` 分支：public repo 只要出現 `gh-pages` 分支，GitHub 就會
-自動開啟 Pages 並發佈，**不需要到 Settings 點任何東西、也不需要 Actions**。
+Dùng nhánh `gh-pages` theo cách truyền thống: khi repo công khai có nhánh `gh-pages`, GitHub sẽ
+tự bật Pages và xuất bản, **không cần vào Settings bấm gì, cũng không cần Actions**.
 
-改完東西之後要更新線上版，就把 `master` 推到 `gh-pages`：
+Khi sửa xong và muốn cập nhật bản trực tuyến, đẩy `master` lên `gh-pages`:
 
 ```
 git push origin master:gh-pages
 ```
 
-> 註：本來試過用 GitHub Actions 部署（`actions/deploy-pages`），行不通 ——
-> 那條路要求 Pages 站台已經存在，而 workflow 的 `GITHUB_TOKEN` 就算給了
-> `pages: write` 也沒有權限建立站台（`Resource not accessible by integration`），
-> 等於一定得先人工去 Settings 點一次。`gh-pages` 分支沒有這個問題，所以
-> 那個 workflow 已經移除。
+> Ghi chú: trước đây đã thử triển khai bằng GitHub Actions (`actions/deploy-pages`) nhưng không được —
+> cách đó yêu cầu trang Pages phải có sẵn, và `GITHUB_TOKEN` trong workflow dù có cấp
+> `pages: write` cũng không có quyền tạo trang (`Resource not accessible by integration`),
+> nghĩa là bắt buộc phải vào Settings bấm thủ công một lần. Nhánh `gh-pages` không gặp vấn đề này,
+> nên workflow đó đã bị gỡ bỏ.
 
 ---
 
-## 版面：原圖是怎麼被切開重排的
+## Bố cục: ảnh gốc được cắt và sắp xếp lại như thế nào
 
-原圖 `34d80fa1-c09c-4050-9b85-a48dfa8796fb.jpg` 是一張「零件排版圖」——
-機台面板、投幣器、賠率牌、按鍵盤散落在白紙上，按鍵盤在右下角，跟輪盤完全沒對齊。
+Ảnh gốc `34d80fa1-c09c-4050-9b85-a48dfa8796fb.jpg` là một "ảnh sắp xếp chi tiết":
+bảng máy, khe xu, bảng tỷ lệ và bàn phím nút bấm nằm rải rác trên nền giấy trắng; bàn phím nằm ở góc dưới bên phải và không thẳng hàng với vòng quay.
 
-`tools/slice_assets.py` 把四個零件切成獨立的 PNG（背景由邊界 flood fill 挖成透明），
-再由 CSS 重新排版，把按鍵盤搬到面板正下方：
+`tools/slice_assets.py` cắt bốn chi tiết thành các PNG riêng (nền được xóa thành trong suốt bằng flood fill từ biên),
+rồi CSS sắp xếp lại, đưa bàn phím xuống ngay dưới bảng chính:
 
-| 零件 | 原圖座標 (l, t, r, b) | 尺寸 |
+| Chi tiết | Tọa độ trên ảnh gốc (l, t, r, b) | Kích thước |
 | --- | --- | --- |
 | `assets/board.png` | 199, 72, 665, 621 | 466 × 549 |
 | `assets/coin.png` | 707, 82, 819, 297 | 112 × 215 |
 | `assets/sign.png` | 689, 337, 833, 564 | 144 × 227 |
 | `assets/panel.png` | 460, 656, 840, 843 | 380 × 187 |
 
-重跑切圖：
+Chạy lại việc cắt ảnh:
 
 ```
 python3 tools/slice_assets.py
 ```
 
-### 按鍵盤與輪盤的對齊
+### Căn chỉnh bàn phím với vòng quay
 
-對齊的基準是「按鍵盤上的 8 顆押注鍵」要落在「面板上的 8 個押注計數器」正下方：
+Mốc căn chỉnh là: "8 nút cược trên bàn phím" phải nằm ngay dưới "8 bộ đếm cược trên bảng".
 
-- 面板 8 個計數器的中心橫跨 board-local x **71.5 → 398.75**
-- 按鍵盤 8 顆押注鍵的中心橫跨 panel-local x **64.5 → 313.5**
+- Tâm 8 bộ đếm trên bảng trải từ x **71.5 → 398.75** (tọa độ cục bộ của bảng)
+- Tâm 8 nút cược trên bàn phím trải từ x **64.5 → 313.5** (tọa độ cục bộ của bàn phím)
 
-兩端對齊解出縮放 **1.3143**、左偏移 **−13.3**。縮放後按鍵盤寬 499.4，
-中心落在 board-local x **236** —— 正好是輪盤（board-local x 67…403，中心 235）的中心線。
-中間幾顆因為按鍵盤有左右分組的間隙，最大誤差約 14px（面板寬度的 3%）。
+Căn hai đầu cho ra tỷ lệ **1.3143** và lệch trái **−13.3**. Sau khi co giãn, bàn phím rộng 499.4,
+tâm nằm ở x **236** trên bảng — đúng đường tâm của vòng quay (x 67…403, tâm 235).
+Các nút ở giữa có lỗ hổng giữa các nhóm trái/phải của bàn phím nên sai số lớn nhất khoảng 14px (3% chiều rộng bàn phím).
 
-### 感應區座標
+### Tọa độ vùng cảm ứng
 
-盤面的 24 格跑燈、七段顯示器、押注計數器、14 顆按鍵的位置都是從原圖量出來的
-像素座標（用色彩 profile 找格線與 LED 視窗），換算成百分比寫進 `styles.css`
-和 `script.js`，所以整台機器可以等比縮放。
+24 ô đèn chạy, màn hình LED 7 đoạn, bộ đếm cược và 14 nút bấm đều là tọa độ pixel đo từ ảnh gốc
+(dùng profile màu để tìm đường lưới và cửa sổ LED), đổi sang phần trăm và ghi vào `styles.css`
+và `script.js`, nên toàn bộ máy có thể co giãn theo tỷ lệ.
 
-輪盤是規整的 7×7 外圈：board-local 起點 (67, 88)，格寬 48.0、格高 48.143，
-順時鐘編號 0–23。
+Vòng quay là lưới 7×7 đều: điểm bắt đầu cục bộ trên bảng (67, 88), rộng ô 48.0, cao ô 48.143,
+đánh số 0–23 theo chiều kim đồng hồ.
 
-想確認對位有沒有跑掉，勾選右側的「顯示感應區（校正用）」就會把所有感應區畫出來。
+Muốn kiểm tra xem căn chỉnh có bị lệch không, tick "Hiện vùng cảm ứng (để hiệu chỉnh)" ở bên phải,
+khi đó mọi vùng cảm ứng sẽ được vẽ ra.
 
-原圖的七段顯示器上印著固定的數字（`40` / `92` / `0` / `2`），切圖時會把這些
-視窗塗成 LED 熄滅的暗紅底，再由遊戲自己用 SVG 畫七段數字（熄滅的筆劃比視窗底色
-更暗，跟原圖一致）。
-
----
-
-## 遊戲規則
-
-盤面上糊掉的印刷字是原圖本身的問題（AI 生成的圖），無法辨識，所以規則是依照
-**真實小瑪莉機台的通行玩法**訂的，來源見文末。
-
-### 八個圖案與賠率
-
-| 圖案 | 賠率 | 盤面格數 |
-| --- | --- | --- |
-| BAR | 100 倍 | 2 |
-| 77 | 40 倍 | 2 |
-| 雙星 | 30 倍 | 2 |
-| 橄欖 | 25 倍 | 2 |
-| 鈴鐺 | 20 倍 | 3 |
-| 西瓜 | 15 倍 | 3 |
-| 橘子 | 10 倍 | 3 |
-| 蘋果 | 5 倍 | 3 |
-| 特別 | 免費再開一次 | 2 |
-| 彩金 | 押注總額 × 10 | 2 |
-
-共 24 格。格數是照原圖盤面上實際畫的圖案數出來的。
-
-### 按鍵功能
-
-按鍵盤上排六顆控制鍵（黃 1 / 橙 2 / 紅 2 / 藍 1），依真實機台的慣例配置：
-
-| 鍵 | 功能 | 快捷鍵 |
-| --- | --- | --- |
-| 洗分（黃） | 得分收進分數；得分為 0 時退幣 | `Q` |
-| 全押（橙左） | 八個圖案各押 1 分 | `W` |
-| 小（橙右） | 比倍猜小（1–7） | `A` |
-| 大（紅左） | 比倍猜大（8–14） | `S` |
-| 比倍（紅右） | 得分翻倍挑戰 | `D` |
-| 開始（藍） | 開始跑燈 | `空白鍵` |
-| 圖案鍵 ×8（下排） | 按一下押 1 分，單一圖案上限 99 分 | `1`–`8` |
-| 投幣器（右上） | 投一枚 10 元 ＝ 10 分 | `C` |
-
-面板上原本印的按鍵標示在原圖裡是糊掉的字，所以標示是重畫上去的。
-
-### 流程
-
-1. 點投幣器取得分數（機台面板標示 10 元）。
-2. 按圖案鍵下注，押注分數即時顯示在盤面下方對應的七段計數器上。
-3. 按「開始」，跑燈繞盤數圈後減速停格。
-4. 停在有押注的圖案 → 得分 ＝ 押注 × 賠率，那一格會閃燈、鍵盤上對應的圖案也跟著閃，
-   閃到下一局開始或按洗分為止。沒中的話那格只是靜態亮著、不閃。
-5. 停在「特別」→ 押注全部保留，下一局免費開獎（累積次數顯示在中央的兩位數顯示器）。
-6. 停在「彩金」→ 不看押的是哪個圖案，直接給 押注總額 × 10。
-7. 有得分時可以「比倍」猜大小：開 1–14，小 = 1–7、大 = 8–14，各半。
-   猜中得分 ×2 可以繼續比，猜錯歸零，最多連比 10 次。
-8. 不比倍就按「洗分」把得分收進分數。
-
-賠率牌上的「5 比 1」用在退幣：5 分換 1 枚。
-
-### 進度會記住
-
-關掉分頁再回來，機台是接著上次繼續的：分數、得分、桌上的押注、累積的「特別」次數、
-跑燈停的位置，以及**機率控制器的積分狀態**（`gamma`、累計投注／得分）都存在
-`localStorage` 的 `marioSlotSave`。
-
-控制器的狀態一定要跟著存。只存分數的話，重整頁面就等於把機台吃分吐分的記憶洗掉，
-玩家隨時能靠重開把返還率控制器歸零 —— 那控制器就形同虛設了。
-
-跑燈中和比倍開號碼中是動畫的中間狀態，不存檔；在這時候關掉，回來會退回上一個
-穩定狀態（押注還在，那一局當作沒發生）。比倍途中關掉，回來會停在「有得分」的狀態，
-要不要再比由玩家自己決定。
-
-沒有另外的「清除紀錄」按鈕：**按洗分退幣就是清台**，跟真機一樣。
-第一次開機（沒有存檔時）送 100 分。
+Ảnh gốc có sẵn các số cố định in trên màn LED 7 đoạn (`40` / `92` / `0` / `2`). Khi cắt ảnh, các cửa sổ này được tô thành nền đỏ sẫm
+của LED đã tắt, rồi trò chơi tự vẽ số 7 đoạn bằng SVG (nét tắt tối hơn nền cửa sổ, khớp với ảnh gốc).
 
 ---
 
-## 開獎機率：為什麼不是均勻亂數
+## Luật chơi
 
-這種台子的賠率表配上均勻開獎是**站不住的**：BAR 100 倍佔 24 格中的 2 格，
-單押 BAR 的期望值就是 100 × 2/24 ≈ 833%。八個圖案全押更是穩賺。
+Chữ in trên bảng bị mờ trong ảnh gốc (ảnh do AI tạo), không đọc được, nên luật được đặt theo
+**cách chơi phổ biến của máy Tiểu Mary thật**; nguồn tham khảo ở cuối tài liệu.
 
-真實小瑪莉本來就不是均勻亂數 —— 台主可以設定返還率，控制器靠「吃分／吐分」
-把實際賠付壓在設定值上。這裡照這個機制實作（`pickCell()` / `updateController()`）：
+### Tám hình và tỷ lệ thưởng
 
-每局對 24 格各自算「如果開這一格，要賠多少」，權重為
+| Hình | Tỷ lệ | Số ô trên bảng |
+| --- | --- | --- |
+| BAR | 100 lần | 2 |
+| 77 | 40 lần | 2 |
+| Sao đôi | 30 lần | 2 |
+| Ô liu | 25 lần | 2 |
+| Chuông | 20 lần | 3 |
+| Dưa hấu | 15 lần | 3 |
+| Cam | 10 lần | 3 |
+| Táo | 5 lần | 3 |
+| Đặc biệt | Quay miễn phí thêm một lần | 2 |
+| Jackpot | Tổng tiền cược × 10 | 2 |
+
+Tổng cộng 24 ô. Số ô được đếm theo số hình thực tế vẽ trên bảng trong ảnh gốc.
+
+### Chức năng các nút
+
+Sáu nút điều khiển hàng trên của bàn phím (vàng 1 / cam 2 / đỏ 2 / xanh 1) được bố trí theo quy ước của máy thật:
+
+| Nút | Chức năng | Phím tắt |
+| --- | --- | --- |
+| Rút (vàng) | Chuyển điểm thắng vào điểm; nếu điểm thắng là 0 thì trả xu | `Q` |
+| Tất cả (cam trái) | Cược 1 điểm cho cả tám hình | `W` |
+| Nhỏ (cam phải) | Gấp đôi: đoán nhỏ (1–7) | `A` |
+| Lớn (đỏ trái) | Gấp đôi: đoán lớn (8–14) | `S` |
+| Gấp đôi (đỏ phải) | Thử gấp đôi điểm thắng | `D` |
+| Quay (xanh) | Bắt đầu chạy đèn | `Space` |
+| Nút hình ×8 (hàng dưới) | Bấm một lần để cược 1 điểm, tối đa 99 điểm cho mỗi hình | `1`–`8` |
+| Khe xu (góc trên phải) | Bỏ một xu 10 đồng = 10 điểm | `C` |
+
+Chữ in trên bàn phím gốc bị mờ trong ảnh nên nhãn được vẽ lại.
+
+### Quy trình
+
+1. Bấm khe xu để có điểm (bảng máy ghi 10 đồng).
+2. Bấm nút hình để cược; số điểm cược hiển thị ngay trên bộ đếm LED tương ứng bên dưới bảng.
+3. Bấm "Quay": đèn chạy quanh vòng nhiều vòng rồi giảm tốc và dừng.
+4. Dừng ở hình có cược → điểm thắng = tiền cược × tỷ lệ. Ô đó nhấp nháy, nút hình tương ứng trên bàn phím cũng nhấp nháy,
+   cho đến khi bắt đầu ván mới hoặc bấm Rút điểm. Nếu không trúng thì ô đó chỉ sáng đứng yên, không nhấp nháy.
+5. Dừng ở "Đặc biệt" → toàn bộ tiền cược được giữ lại, ván sau quay miễn phí (số lần tích lũy hiển thị ở màn LED hai chữ số giữa).
+6. Dừng ở "Jackpot" → không cần biết đã cược hình nào, trả thẳng tổng tiền cược × 10.
+7. Khi có điểm thắng có thể "Gấp đôi" để đoán lớn nhỏ: mở số 1–14, Nhỏ = 1–7, Lớn = 8–14, mỗi bên một nửa.
+   Đoán trúng nhân ×2 và có thể đoán tiếp; đoán sai về 0; tối đa 10 lần liên tiếp.
+8. Không muốn gấp đôi thì bấm "Rút điểm" để chuyển điểm thắng vào điểm.
+
+Nhãn "5 đổi 1" trên bảng tỷ lệ dùng cho việc trả xu: 5 điểm đổi 1 xu.
+
+### Tiến trình được ghi nhớ
+
+Đóng tab rồi mở lại, máy vẫn tiếp tục như cũ: điểm, điểm thắng, tiền cược trên bàn, số lần "Đặc biệt" tích lũy,
+vị trí đèn đang dừng, và **trạng thái bộ điều khiển xác suất** (`gamma`, tổng cược/tổng điểm trả) đều được lưu trong
+`localStorage` với khóa `marioSlotSave`.
+
+Phải lưu trạng thái bộ điều khiển. Nếu chỉ lưu điểm, tải lại trang sẽ xóa trí nhớ ăn/nhả điểm của máy,
+và người chơi có thể đặt lại bộ điều khiển về 0 chỉ bằng cách tải lại trang, khi đó bộ điều khiển không còn tác dụng.
+
+Lúc đèn đang quay và lúc đang mở số gấp đôi là các trạng thái trung gian của hoạt ảnh nên không lưu; nếu tắt đúng lúc đó,
+khi mở lại máy sẽ quay về trạng thái ổn định trước đó (tiền cược vẫn còn, ván đó coi như chưa diễn ra).
+Nếu tắt khi đang gấp đôi, khi mở lại sẽ ở trạng thái "có điểm thắng", để người chơi tự quyết có đoán tiếp hay không.
+
+Không có nút "xóa dữ liệu" riêng: **bấm Rút điểm rồi trả xu tức là reset máy**, giống máy thật.
+Lần đầu mở máy (chưa có dữ liệu lưu) sẽ được tặng 100 điểm.
+
+---
+
+## Xác suất mở thưởng: vì sao không dùng số ngẫu nhiên đều
+
+Với bảng tỷ lệ này, nếu mở thưởng bằng số ngẫu nhiên đều thì **không ổn**: BAR chiếm 2 trên 24 ô và trả 100 lần,
+nên kỳ vọng khi chỉ cược BAR là 100 × 2/24 ≈ 833%. Cược cả tám hình thì chắc chắn thắng.
+
+Máy Tiểu Mary thật vốn không dùng số ngẫu nhiên đều: chủ máy có thể đặt tỷ lệ hoàn trả, và bộ điều khiển
+dùng cơ chế "ăn điểm/nhả điểm" để kéo tổng tiền trả về giá trị đã đặt. Trò chơi này làm theo cơ chế đó (`pickCell()` / `updateController()`):
+
+Mỗi ván tính cho 24 ô riêng lẻ "nếu dừng ở ô này thì phải trả bao nhiêu", và trọng số là
 
 ```
-weight = 基礎出現頻率 × exp(gamma × payout / 押注總額)
+weight = tần suất cơ bản × exp(gamma × payout / tổng cược)
 ```
 
-`gamma` 是控制器的積分狀態，每局用「該收的抽成 − 實際賠出去的分」去修正它。
-賠太多 → `gamma` 往負走 → 賠得多的格子被指數壓下去，機台開始吃分；
-賠不夠 → `gamma` 往正走 → 那些格子被放大，機台開始吐分。
+`gamma` là trạng thái tích lũy của bộ điều khiển, mỗi ván được chỉnh theo chênh lệch giữa "phí thu lẽ ra phải có" và "điểm thực tế đã trả".
+Trả quá nhiều → `gamma` đi xuống → các ô trả nhiều bị đè xuống theo hàm mũ, máy bắt đầu ăn điểm;
+trả chưa đủ → `gamma` đi lên → các ô đó được khuếch đại, máy bắt đầu nhả điểm.
 
-兩個實作上的重點：
+Hai điểm quan trọng khi cài đặt:
 
-1. `gamma` 必須乘在 payout 上，改變權重的「斜率」。如果只是對每一格加同一個
-   偏移量，softmax 正規化的時候會整個消掉，等於沒有控制。
-2. 要用積分（逐局累加誤差）而不是比例（直接拿誤差當增益）。比例控制會停在
-   「誤差 × 增益」剛好撐住的地方，留下固定的穩態偏差。
-3. 「特別」送的免費開獎照樣會賠分卻不進帳，所以那一局的 `charged` 要記 0，
-   否則免費局的賠付會憑空墊高返還率。
+1. `gamma` phải nhân với payout để thay đổi "độ dốc" của trọng số. Nếu chỉ cộng cùng một độ lệch cho mọi ô,
+   bước chuẩn hóa softmax sẽ triệt tiêu nó và không còn tác dụng điều khiển.
+2. Dùng tích phân (cộng dồn sai số qua các ván) thay vì tỷ lệ (lấy trực tiếp sai số làm hệ số khuếch đại). Điều khiển tỷ lệ sẽ dừng
+   ở điểm mà "sai số × hệ số" vừa đủ giữ, để lại một độ lệch ổn định cố định.
+3. Lượt "Đặc biệt" miễn phí vẫn trả điểm nhưng không thu tiền, nên ván đó phải ghi `charged = 0`;
+   nếu không, lượt miễn phí sẽ làm tăng tỷ lệ hoàn trả một cách giả tạo.
 
-實測（每種策略各 20000 局，`CONFIG.targetRTP` 設 0.80 / 0.90 / 0.97）：
+Kết quả đo được (mỗi chiến lược 20000 ván, đặt `CONFIG.targetRTP` là 0.80 / 0.90 / 0.97):
 
-| 策略 | 目標 0.80 | 目標 0.90 | 目標 0.97 |
+| Chiến lược | Mục tiêu 0.80 | Mục tiêu 0.90 | Mục tiêu 0.97 |
 | --- | --- | --- | --- |
-| 八個圖案全押 | 0.799 | 0.899 | 0.969 |
-| 隨機挑幾個押 | 0.797 | 0.899 | 0.968 |
-| 只押 BAR | 0.792 | 0.894 | 0.963 |
-| 只押蘋果 | 0.797 | 0.897 | 0.967 |
+| Cược cả tám hình | 0.799 | 0.899 | 0.969 |
+| Cược ngẫu nhiên vài hình | 0.797 | 0.899 | 0.968 |
+| Chỉ cược BAR | 0.792 | 0.894 | 0.963 |
+| Chỉ cược Táo | 0.797 | 0.897 | 0.967 |
 
-要調整機台，改 `script.js` 最上面的 `CONFIG`：
+Muốn điều chỉnh máy, sửa `CONFIG` ở đầu `script.js`:
 
 ```js
-targetRTP: 0.90,   // 返還率設定
-steer: 0.03,       // 控制器的積分速率，越大修正越快、波動越小
+targetRTP: 0.90,   // Tỷ lệ hoàn trả đặt cho máy
+steer: 0.03,       // Tốc độ tích lũy của bộ điều khiển, lớn thì chỉnh nhanh hơn, dao động ít hơn
 ```
 
-順帶一提：全押的時候機台為了守住返還率會大量開蘋果（最便宜的賠付），
-所以**全押是很差的打法** —— 這點跟真實機台一樣。
+Lưu ý thêm: khi cược cả tám hình, để giữ tỷ lệ hoàn trả máy sẽ mở ra Táo rất nhiều (khoản trả thấp nhất),
+nên **cược cả tám hình là cách chơi rất kém** — điều này cũng đúng với máy thật.
 
 ---
 
----
+## Âm thanh: cắt từ một đoạn ghi âm liên tục
 
-## 音效：從一段連續錄音切出來
+`tools/slice_audio.py` cắt bản ghi âm máy thật thành các hiệu ứng âm thanh của trò chơi, theo cùng một quy trình với việc cắt ảnh:
+nguồn giữ nguyên, quy tắc cắt viết thành văn bản thuần, chạy lại là ra kết quả giống hệt.
 
-`tools/slice_audio.py` 負責把真機錄音切成遊戲音效，跟切圖同一套路：素材放原始檔、
-切割規則寫成純文字、重跑就能得到一樣的結果。
-
-需要的套件（pip 就能裝，不必系統權限）：
+Thư viện cần thiết (cài bằng pip, không cần quyền hệ thống):
 
 ```
 pip install imageio-ffmpeg numpy pillow
 ```
 
-### 三個步驟
+### Ba bước
 
 ```
-# 1. 自動找出「聲音在哪裡」
+# 1. Tự động tìm xem "âm thanh nằm ở đâu"
 python3 tools/slice_audio.py analyze audio/src/raw.mp4
-#    → audio/work/segments.tsv   候選片段清單
-#    → audio/work/waveform.png   標了編號的波形圖
-#    → audio/work/preview/*.wav  每段的試聽檔
+#    → audio/work/segments.tsv   danh sách đoạn ứng viên
+#    → audio/work/waveform.png   dạng sóng có đánh số
+#    → audio/work/preview/*.wav  file nghe thử của từng đoạn
 
-# 2. 編輯 segments.tsv 把 name 欄改成正式名稱、刪掉不要的列，然後切
+# 2. Sửa segments.tsv: đổi cột name thành tên chính thức, xóa dòng không cần, rồi cắt
 python3 tools/slice_audio.py cut audio/src/raw.mp4
 #    → audio/clips/*.wav
 
-# 3. 打包成單一檔案 + 偏移表
+# 3. Đóng gói thành một file + bảng độ lệch
 python3 tools/slice_audio.py sprite
 #    → assets/audio/sprite.mp3 / sprite.ogg / sprite.json
 ```
 
-**機器只能自動找「邊界」，沒辦法知道第 47 段是中獎還是押注 —— 中間那步一定要人工命名。**
+**Máy chỉ tự tìm được "biên", không biết được đoạn thứ 47 là trúng thưởng hay cược — bước giữa nhất định phải đặt tên thủ công.**
 
-### 幾個會遇到的狀況
+### Một số tình huống thường gặp
 
-- **跑燈聲被當成一整塊**：跑燈是同一顆「嗶」快速重複，間隔可能只有 35ms，
-  低於預設的 `--min-silence 0.08` 就會黏在一起。調成 `--min-silence 0.02` 就會拆開。
-  遊戲只需要**一顆乾淨的 tick**，重複播放由程式負責。
-- **底噪重**：`--threshold` 調高（例如 `-35`）避免把噪音當片段；切的時候加
-  `--denoise` 開降噪，但音色會偏金屬感，能不開就不開。
-- **背景音樂混進去**：機台待機音樂常常一直在播，切出來會帶音樂尾巴。
-  優先挑「音樂安靜、只按單一按鍵」的片段。
+- **Tiếng đèn chạy bị gộp thành một khối**: đèn chạy là tiếng "bíp" lặp nhanh, khoảng cách có thể chỉ 35ms,
+  nhỏ hơn mức `--min-silence 0.08` mặc định nên bị dính vào nhau. Đặt `--min-silence 0.02` để tách ra.
+  Trò chơi chỉ cần **một tick sạch**, việc lặp lại do chương trình đảm nhiệm.
+- **Nhiễu nền lớn**: tăng `--threshold` (ví dụ `-35`) để tránh coi tiếng ồn là âm thanh; khi cắt có thể thêm
+  `--denoise` để khử nhiễu, nhưng âm sắc sẽ bị kim loại, nên tránh dùng nếu không cần.
+- **Nhạc nền lọt vào**: nhạc chờ của máy thường phát liên tục, khi cắt sẽ mang theo đuôi nhạc.
+  Ưu tiên chọn đoạn lúc nhạc yên lặng và chỉ có một phím được bấm.
 
-### 目前接進遊戲的音效
+### Âm thanh hiện đang dùng trong trò chơi
 
-音源是真機錄音，時間軸標記在 `audio/cues/machine.tsv`。
+Nguồn âm là bản ghi âm máy thật, mốc thời gian nằm trong `audio/cues/machine.tsv`.
 
-| 名稱 | 觸發 | 說明 |
+| Tên | Kích hoạt | Mô tả |
 | --- | --- | --- |
-| `coin` | 點投幣器 | 1.28s，一連串機械撞擊；連點時會中斷前一次 |
-| `bet` | 押注鍵、全押 | 0.43s |
-| `tick1`–`tick4` | 跑燈每前進一格、比倍號碼滾動 | 各 37ms，四顆輪流播放 |
-| `win` | 中獎 | 6.14s；開始新一局或按洗分時會停掉 |
+| `coin` | Bấm khe xu | 1.28s, chuỗi tiếng va chạm cơ khí; bấm liên tục sẽ ngắt lần trước |
+| `bet` | Nút cược, Tất cả | 0.43s |
+| `tick1`–`tick4` | Đèn chạy mỗi lần qua một ô; số gấp đôi lăn | mỗi tiếng 37ms, phát luân phiên bốn tiếng |
+| `win` | Trúng thưởng | 6.14s; dừng khi bắt đầu ván mới hoặc bấm Rút điểm |
 
-跑燈刻意用四顆輪流而不是一顆重複 —— 真機的跑燈是一段音階（實測音高
-`750 812 875 938 1000 1062 …` 上行），單顆重複會很單調。
+Đèn chạy dùng bốn tiếng luân phiên thay vì một tiếng lặp lại — tiếng đèn chạy của máy thật là một dãy nốt
+(đo được cao độ tăng dần `750 812 875 938 1000 1062 …`), lặp một tiếng sẽ rất đơn điệu.
 
-中獎音樂的起點實測在 **27.860**（27.86 有 −42.8 dB 的能量低谷，前一段在那裡結束）。
-結尾 34.0 不是樂句邊界 —— 音樂一路延續到 36.5 都沒停，自相關算出的樂句候選
-（1.6 / 1.7 / 1.8 / 1.9 / 2.0 秒）很分散，是發展中的旋律而非循環樂句，
-所以照標定切、結尾用 400ms 淡出收掉。cue sheet 的第四欄就是淡出毫秒數。
+Điểm bắt đầu của nhạc trúng thưởng đo được là **27.860** (tại 27.86 có chỗ năng lượng thấp −42.8 dB, đoạn trước kết thúc ở đó).
+Điểm kết thúc 34.0 không phải là ranh giới câu nhạc — nhạc tiếp tục đến 36.5 không dừng,
+các ứng viên độ dài câu tính theo tự tương quan (1.6 / 1.7 / 1.8 / 1.9 / 2.0 giây) khá phân tán,
+đây là giai điệu đang phát triển chứ không phải câu nhạc lặp, nên cắt theo mốc đã định và kết thúc bằng fade-out 400ms.
+Cột thứ tư của cue sheet chính là thời gian fade-out tính bằng mili giây.
 
-還缺的：`land` `lose` `special` `bonus` `double_*` `wash` `payout`，等有音源再補。
+Chưa có nguồn âm cho: `land` `lose` `special` `bonus` `double_*` `wash` `payout`, sẽ bổ sung khi có.
 
-### 播放：為什麼不直接用 sprite.json 的偏移量
+### Phát âm: vì sao không dùng độ lệch trong sprite.json trực tiếp
 
-網頁端載入後**不直接採用** `sprite.json` 裡的起點，而是從解碼後的波形裡找出
-片段之間那 0.1 秒的靜音，重新推算邊界（`Sound._mapClips`）。
+Sau khi tải, trang web **không dùng trực tiếp** điểm bắt đầu trong `sprite.json`, mà tìm lại
+khoảng im lặng 0.1 giây giữa các đoạn trong dạng sóng đã giải mã, từ đó tính lại biên (`Sound._mapClips`).
 
-原因是有些瀏覽器解碼壓縮音訊時會在開頭多出編碼器延遲，整批偏移量會一起位移；
-tick 只有 37ms，位移個十幾毫秒就完全走鐘。實測 Chromium 會處理 mp3 的
-gapless 資訊、位移只有 −0.7ms（ogg 是 −5.7ms），但不是每個瀏覽器都這樣，
-所以用偵測當保險。偵測到的段數跟預期不符時會退回 json 的偏移量。
+Lý do: có trình duyệt khi giải mã âm thanh nén sẽ thêm độ trễ của bộ mã hóa ở đầu, khiến cả bảng độ lệch
+bị dịch theo; tick chỉ dài 37ms nên lệch vài chục mili giây là sai hẳn. Thử nghiệm cho thấy Chromium xử lý
+thông tin gapless của mp3 và chỉ lệch −0.7ms (ogg là −5.7ms), nhưng không phải trình duyệt nào cũng vậy,
+nên vẫn dùng phát hiện như một phương án bảo hiểm. Nếu số đoạn phát hiện được không khớp với dự kiến
+thì quay về độ lệch của json.
 
-音效用 Web Audio API 而不是 `<audio>` 元素：跑燈最快 34ms 響一次，
-`<audio>` 的延遲和重複觸發跟不上。
+Âm thanh dùng Web Audio API thay vì phần tử `<audio>`: đèn chạy nhanh nhất 34ms phát một tiếng,
+độ trễ và phát lặp của `<audio>` không theo kịp.
 
-### 音質處理的取捨
+### Đánh đổi về chất lượng âm
 
-去頭尾靜音、淡入淡出、正規化都在 numpy 做，不用 ffmpeg 濾波器，原因寫在程式碼裡：
+Cắt khoảng lặng đầu/cuối, fade-in/fade-out và chuẩn hóa mức đều làm bằng numpy, không dùng bộ lọc của ffmpeg; lý do được ghi trong code:
 
-- `silenceremove,areverse,silenceremove,areverse` 這個常見寫法會整段吃掉
-  （實測 0.48s 的旋律變成 0.000s）。
-- `dynaudnorm` 之類的動態正規化會把衰減的尾音推上來、改掉音色。這裡的目標是
-  保留真機音色，所以只做固定增益的峰值正規化（預設 −1 dBFS），片段內部的
-  強弱關係完全不變。
-- 兩端各加 3ms 淡入淡出，避免切點落在非零處造成「喀」的爆音。
-
----
-
-## 檔案
-
-```
-index.html                 頁面結構
-styles.css                 版面與所有感應區的座標
-script.js                  遊戲邏輯、七段顯示器、跑燈、機率控制器
-tools/slice_assets.py      從原圖切出四個零件
-tools/slice_audio.py       從錄音切出音效並打包成 sprite
-assets/*.png               切好的零件
-assets/audio/              音效 sprite（有音源之後才會有）
-34d80fa1-....jpg           原始排版圖（切圖的來源，請保留）
-```
+- Cách viết thường gặp `silenceremove,areverse,silenceremove,areverse` sẽ cắt mất cả đoạn
+  (thử nghiệm: giai điệu dài 0.48s thành 0.000s).
+- Chuẩn hóa động như `dynaudnorm` sẽ đẩy phần đuôi đang tắt dần lên và làm đổi âm sắc. Mục tiêu ở đây là giữ
+  âm sắc máy thật, nên chỉ dùng chuẩn hóa đỉnh với hệ số cố định (mặc định −1 dBFS), độ mạnh nhẹ bên trong mỗi đoạn không đổi.
+- Thêm fade-in/fade-out 3ms ở hai đầu để điểm cắt không rơi vào chỗ khác 0, tránh tiếng "tách" gây giật.
 
 ---
 
-## 參考資料
+## File
 
-規則、按鍵、比倍機率、押注上限的依據：
+```
+index.html                 cấu trúc trang
+styles.css                 bố cục và tọa độ của mọi vùng cảm ứng
+script.js                  logic trò chơi, màn LED 7 đoạn, đèn chạy, bộ điều khiển xác suất
+tools/slice_assets.py      cắt bốn chi tiết từ ảnh gốc
+tools/slice_audio.py       cắt âm thanh từ bản ghi và đóng gói thành sprite
+assets/*.png               các chi tiết đã cắt
+assets/audio/              sprite âm thanh (chỉ có sau khi có nguồn âm)
+34d80fa1-....jpg           ảnh bố cục gốc (nguồn để cắt ảnh, xin giữ lại)
+```
+
+---
+
+## Tài liệu tham khảo
+
+Luật chơi, phím bấm, quy tắc gấp đôi và giới hạn cược dựa trên:
 
 - [【復古遊戲】經典小瑪莉超進化水果盤遊戲介紹｜錢盈娛樂城](https://blog.qywin88.com/all-articles/slot/mario-slot-machine/)
-  —— 投幣 10 元、下排按鍵一下一分、按 START 跑燈、圖案旁 LED 亮起即中獎
+  — đút xu 10 đồng, nút hàng dưới mỗi lần bấm 1 điểm, bấm START để đèn chạy, đèn LED cạnh hình sáng lên là trúng
 - [小瑪莉玩法：復古水果盤！麻仔台意思、怎麼玩？](https://www.wof888.com/post/smasllmally0912)
-  —— 8 個圖案下注、跑燈停在有押注的獎項即中獎、中獎後可選擇洗分或比倍、
-  比倍猜中獎金 ×2 猜錯歸零、機率 1/2
+  — cược trên 8 hình, đèn dừng ở giải có cược là trúng, sau khi trúng có thể chọn rút điểm hoặc gấp đôi,
+  gấp đôi đoán đúng nhân ×2, đoán sai về 0, xác suất 1/2
 - [水果機小瑪莉：麻仔台, 老虎機（Google Play）](https://play.google.com/store/apps/details?id=com.Sapp.MaLiElephant&hl=zh_TW)
-  —— 蘋果／橘子／葡萄（橄欖）／鈴鐺／西瓜／雙星／77／BAR 共 8 個下注選項，
-  每一選項最高可押至 99 分
+  — 8 lựa chọn cược: Táo / Cam / Ô liu (nho) / Chuông / Dưa hấu / Sao đôi / 77 / BAR,
+  mỗi lựa chọn cược tối đa 99 điểm
 - [【小瑪莉玩法】時代眼淚也跟上時代了](https://i88176.com/blog/lilmary20221117/)
 
-賠率倍數各家機台版本不同（搜尋結果本身也這麼說），這裡採用流通最廣的一組
-5 / 10 / 15 / 20 / 25 / 30 / 40 / 100。
+Tỷ lệ thưởng khác nhau giữa các phiên bản máy (chính kết quả tìm kiếm cũng nói vậy), ở đây dùng bộ được lưu hành rộng nhất
+5 / 10 / 15 / 20 / 25 / 30 / 40 / 100.

@@ -1,106 +1,106 @@
 <!DOCTYPE html>
-<html lang="zh-TW">
+<html lang="vi">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>小瑪莉 水果盤 模擬器</title>
+    <title>Tiểu Mary – Mô phỏng máy khay trái cây</title>
     <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='5' fill='%231d1512'/%3E%3Ccircle cx='16' cy='18' r='8' fill='%23e23b2e'/%3E%3Cpath d='M16 10c0-3 2-5 5-5-1 3-2 5-5 5z' fill='%232e9e4a'/%3E%3C/svg%3E">
     <link rel="stylesheet" href="styles.css">
 </head>
 <body>
 
 <div class="stage">
-    <!-- 機台：由原圖切出的四個零件重新排版，按鍵盤已搬到面板正下方、與輪盤對齊 -->
+    <!-- Máy: bốn chi tiết cắt từ ảnh gốc được sắp xếp lại; phím bấm đã chuyển xuống ngay dưới bảng và thẳng hàng với vòng quay -->
     <div class="cabinet" id="cabinet">
 
-        <!-- ── 主面板：輪盤 + 七段顯示器 ── -->
+        <!-- ── Bảng chính: vòng quay + màn LED 7 đoạn ── -->
         <div class="piece piece-board">
-            <img src="assets/board.png" alt="小瑪莉面板" draggable="false">
+            <img src="assets/board.png" alt="Bảng Tiểu Mary" draggable="false">
 
-            <!-- 蓋掉原圖上糊掉的印刷字，換成看得懂的標示 -->
-            <div class="plate-label" id="label-credit">分　數</div>
-            <div class="plate-label" id="label-score">得　分</div>
+            <!-- Che chữ in bị mờ trên ảnh gốc, thay bằng nhãn dễ đọc -->
+            <div class="plate-label" id="label-credit">ĐIỂM</div>
+            <div class="plate-label" id="label-score">THẮNG</div>
 
-            <!-- 七段顯示器（由 JS 填入 SVG 數字） -->
-            <div class="seg-display" id="disp-credit" data-digits="4" title="分數 CREDIT"></div>
-            <div class="seg-display" id="disp-score" data-digits="4" title="得分 SCORE"></div>
-            <div class="seg-display" id="disp-center" data-digits="2" title="比倍號碼 / 特別次數"></div>
+            <!-- Màn LED 7 đoạn (JS điền số bằng SVG) -->
+            <div class="seg-display" id="disp-credit" data-digits="4" title="Điểm CREDIT"></div>
+            <div class="seg-display" id="disp-score" data-digits="4" title="Điểm thắng SCORE"></div>
+            <div class="seg-display" id="disp-center" data-digits="2" title="Số gấp đôi / số lần đặc biệt"></div>
 
-            <!-- 輪盤 24 格跑燈（JS 產生） -->
+            <!-- Đèn chạy 24 ô của vòng quay (JS tạo) -->
             <div class="lamp-layer" id="lamp-layer"></div>
 
-            <!-- 盤面下方 8 個押注計數器（JS 產生） -->
+            <!-- 8 bộ đếm cược bên dưới bảng (JS tạo) -->
             <div class="bet-meters" id="bet-meters"></div>
 
-            <!-- 中獎 / 特別 / 彩金 提示 -->
+            <!-- Thông báo trúng thưởng / đặc biệt / jackpot -->
             <div class="banner" id="banner" aria-live="polite"></div>
         </div>
 
-        <!-- ── 投幣器：點一下投一枚 10 元 ── -->
-        <button class="piece piece-coin" id="coin-slot" title="投幣（10 元 = 10 分）　快捷鍵 C">
-            <img src="assets/coin.png" alt="投幣器" draggable="false">
-            <span class="coin-hint">投幣</span>
+        <!-- ── Khe đút xu: bấm một lần để đút 1 xu 10 đồng ── -->
+        <button class="piece piece-coin" id="coin-slot" title="Bỏ xu (10 đồng = 10 điểm)　Phím tắt: C">
+            <img src="assets/coin.png" alt="Khe đút xu" draggable="false">
+            <span class="coin-hint">BỎ XU</span>
         </button>
 
-        <!-- ── 賠率牌 ── -->
+        <!-- ── Bảng tỷ lệ thưởng ── -->
         <div class="piece piece-sign">
-            <img src="assets/sign.png" alt="賠率牌" draggable="false">
+            <img src="assets/sign.png" alt="Bảng tỷ lệ thưởng" draggable="false">
         </div>
 
-        <!-- ── 按鍵盤：已與輪盤中心對齊 ── -->
+        <!-- ── Bàn phím nút bấm: đã thẳng hàng với tâm vòng quay ── -->
         <div class="piece piece-panel">
-            <img src="assets/panel.png" alt="按鍵盤" draggable="false">
+            <img src="assets/panel.png" alt="Bàn phím nút bấm" draggable="false">
             <div class="key-layer" id="key-layer"></div>
         </div>
     </div>
 
-    <!-- ── 側邊資訊 ── -->
+    <!-- ── Thông tin bên cạnh ── -->
     <aside class="hud">
-        <h1>小瑪莉 <small>水果盤模擬器</small></h1>
+        <h1>Tiểu Mary <small>Mô phỏng máy khay trái cây</small></h1>
 
         <section>
-            <h2>賠率表</h2>
+            <h2>Bảng tỷ lệ thưởng</h2>
             <table class="odds" id="odds-table"></table>
-            <p class="note">盤面 24 格：可押圖案 20 格 + 特別 2 格 + 彩金 2 格。</p>
+            <p class="note">Bảng quay 24 ô: 20 ô hình có thể cược + 2 ô đặc biệt + 2 ô jackpot.</p>
         </section>
 
         <section>
-            <h2>操作</h2>
+            <h2>Thao tác</h2>
             <dl class="keys">
-                <dt>投幣器</dt><dd>投一枚 10 元 ＝ 10 分<kbd>C</kbd></dd>
-                <dt>圖案鍵 ×8</dt><dd>按一下押 1 分，單一圖案上限 99 分<kbd>1</kbd>…<kbd>8</kbd></dd>
-                <dt>全押</dt><dd>八個圖案各押 1 分（需 8 分）<kbd>W</kbd></dd>
-                <dt>開始</dt><dd>開始跑燈開獎<kbd>空白</kbd></dd>
-                <dt>比倍</dt><dd>得分不為 0 時進入比大小<kbd>D</kbd></dd>
-                <dt>小 / 大</dt><dd>比倍時猜 1–7 或 8–14<kbd>A</kbd><kbd>S</kbd></dd>
-                <dt>洗分</dt><dd>得分收進分數；得分為 0 時退幣<kbd>Q</kbd></dd>
+                <dt>Khe xu</dt><dd>Bỏ 1 xu 10 đồng = 10 điểm<kbd>C</kbd></dd>
+                <dt>Nút hình ×8</dt><dd>Bấm một lần để cược 1 điểm; tối đa 99 điểm cho mỗi hình<kbd>1</kbd>…<kbd>8</kbd></dd>
+                <dt>Cược tất cả</dt><dd>Cược 1 điểm cho cả tám hình (cần 8 điểm)<kbd>W</kbd></dd>
+                <dt>Quay</dt><dd>Bắt đầu chạy đèn và quay thưởng<kbd>Space</kbd></dd>
+                <dt>Gấp đôi</dt><dd>Khi có điểm thắng thì vào vòng đoán lớn nhỏ<kbd>D</kbd></dd>
+                <dt>Nhỏ / Lớn</dt><dd>Trong vòng gấp đôi, đoán 1–7 hoặc 8–14<kbd>A</kbd><kbd>S</kbd></dd>
+                <dt>Rút điểm</dt><dd>Chuyển điểm thắng vào điểm; nếu điểm thắng là 0 thì trả xu<kbd>Q</kbd></dd>
             </dl>
         </section>
 
         <section>
-            <h2>玩法</h2>
+            <h2>Cách chơi</h2>
             <ol class="rules">
-                <li>投幣取得分數 (快捷鍵 <kbd>C</kbd>)，用下排八個圖案鍵 (快捷鍵 <kbd>1</kbd>-<kbd>8</kbd>) 下注，押注分數顯示在盤面下方的計數器。全押可按 <kbd>W</kbd>。</li>
-                <li>按「開始」 (快捷鍵 <kbd>空白鍵</kbd>) 後跑燈繞盤，停在哪一格就開哪一格。</li>
-                <li>停在你有押注的圖案 → 得分 ＝ 押注 × 賠率。</li>
-                <li>停在「特別」→ 押注全部保留，免費再開一次。</li>
-                <li>停在「彩金」→ 不看押注圖案，直接給 押注總額 × 10。</li>
-                <li>有得分時可以「比倍」 (快捷鍵 <kbd>D</kbd>) 猜大小 (小 <kbd>A</kbd>、大 <kbd>S</kbd>)，猜中 ×2、猜錯歸零，最多連比 10 次。</li>
-                <li>不想比倍就按「洗分」 (快捷鍵 <kbd>Q</kbd>) 把得分收進分數。</li>
+                <li>Bỏ xu để có điểm (phím tắt <kbd>C</kbd>), dùng tám nút hình ở hàng dưới (phím tắt <kbd>1</kbd>-<kbd>8</kbd>) để cược. Số điểm cược hiển thị ở bộ đếm bên dưới bảng. Cược tất cả bằng phím <kbd>W</kbd>.</li>
+                <li>Bấm "Quay" (phím tắt <kbd>Space</kbd>), đèn sẽ chạy quanh vòng quay và dừng ở ô nào thì ô đó được mở.</li>
+                <li>Dừng ở hình bạn đã cược → điểm thắng = tiền cược × tỷ lệ thưởng.</li>
+                <li>Dừng ở "Đặc biệt" → giữ nguyên toàn bộ tiền cược, được quay miễn phí thêm một lần.</li>
+                <li>Dừng ở "Jackpot" → không cần xem hình đã cược, trả thẳng tổng tiền cược × 10.</li>
+                <li>Khi có điểm thắng, có thể "Gấp đôi" (phím tắt <kbd>D</kbd>) để đoán lớn nhỏ (Nhỏ <kbd>A</kbd>, Lớn <kbd>S</kbd>). Đoán đúng nhân ×2, đoán sai về 0; tối đa 10 lần liên tiếp.</li>
+                <li>Không muốn gấp đôi thì bấm "Rút điểm" (phím tắt <kbd>Q</kbd>) để chuyển điểm thắng vào điểm.</li>
             </ol>
         </section>
 
         <section>
-            <h2>機台設定</h2>
+            <h2>Cài đặt máy</h2>
             <p class="note" id="rtp-note"></p>
-            <label class="toggle"><input type="checkbox" id="sound-toggle" checked> 音效</label>
-            <label class="toggle slider-row">音量
+            <label class="toggle"><input type="checkbox" id="sound-toggle" checked> Âm thanh</label>
+            <label class="toggle slider-row">Âm lượng
                 <input type="range" id="volume-slider" min="0" max="1" step="0.05" value="0.7">
             </label>
-            <p class="note">音效取自真機錄音。第一次點擊畫面後才會出聲（瀏覽器規定）。</p>
-            <label class="toggle"><input type="checkbox" id="debug-toggle"> 顯示感應區（校正用）</label>
-            <p class="note">進度會存在這台瀏覽器裡：關掉重開會接續分數、押注與機台的吃分吐分狀態。
-                退幣就等於清台。</p>
+            <p class="note">Âm thanh lấy từ bản ghi âm máy thật. Chỉ phát sau lần bấm đầu tiên trên trang (quy định của trình duyệt).</p>
+            <label class="toggle"><input type="checkbox" id="debug-toggle"> Hiện vùng cảm ứng (để hiệu chỉnh)</label>
+            <p class="note">Tiến trình được lưu trong trình duyệt này: tắt rồi mở lại sẽ tiếp tục điểm, tiền cược và trạng thái ăn/nhả điểm của máy.
+                Trả xu tức là reset máy.</p>
         </section>
     </aside>
 </div>
