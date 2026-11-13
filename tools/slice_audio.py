@@ -1,38 +1,38 @@
 #!/usr/bin/env python3
-"""從一段連續錄音切出遊戲音效，最後打包成 audio sprite。
+"""Cắt hiệu ứng âm thanh của trò chơi từ một bản ghi liên tục, rồi đóng gói thành audio sprite.
 
-跟 slice_assets.py 是同一套路：素材放原始檔，切割規則寫成純文字，
-重跑腳本就能得到一模一樣的結果。
+Cùng một quy trình với slice_assets.py: nguồn giữ nguyên, quy tắc cắt viết thành
+văn bản, chạy lại script sẽ ra kết quả giống hệt.
 
-三個步驟：
+Ba bước:
 
-  1. analyze  自動找出「聲音在哪裡」，產生候選片段清單 + 波形圖
-  2. cut      依照你標好名字的 cue sheet 切出片段（降噪、正規化、去頭尾靜音）
-  3. sprite   把片段接成單一檔案 + 時間偏移表，給網頁一次載入
+  1. analyze  tự động tìm "âm thanh nằm ở đâu", tạo danh sách đoạn ứng viên + dạng sóng
+  2. cut      cắt theo cue sheet đã đặt tên (khử nhiễu, chuẩn hóa, bỏ khoảng lặng đầu/cuối)
+  3. sprite   nối các đoạn thành một file + bảng độ lệch thời gian, để web tải một lần
 
-機器只能自動找「邊界」，沒辦法知道「第 47 段是中獎還是押注」，
-所以中間一定要人工把 segments.tsv 的名字填上。
+Máy chỉ tự tìm được "biên", không biết được đoạn thứ 47 là trúng thưởng hay cược,
+nên bước giữa nhất định phải đặt tên thủ công trong segments.tsv.
 
-用法：
+Cách dùng:
 
-    # 1. 先看看錄音裡有哪些片段（來源可以是 mp4 / mp3 / wav …）
+    # 1. Xem trước trong bản ghi có những đoạn âm thanh nào (nguồn có thể là mp4 / mp3 / wav …)
     python3 tools/slice_audio.py analyze audio/src/raw.mp4
 
-    #    → audio/work/segments.tsv   候選片段（把 name 欄改成正式名稱）
-    #    → audio/work/waveform.png   標了編號的波形圖，對照用
-    #    → audio/work/preview/*.wav  每段的試聽檔
+    #    → audio/work/segments.tsv   danh sách đoạn ứng viên (đổi cột name thành tên chính thức)
+    #    → audio/work/waveform.png   dạng sóng có đánh số, để đối chiếu
+    #    → audio/work/preview/*.wav  file nghe thử của từng đoạn
 
-    # 2. 編輯 segments.tsv，只留下要用的段落並命名，然後切
+    # 2. Sửa segments.tsv, chỉ giữ lại các đoạn cần dùng và đặt tên, rồi cắt
     python3 tools/slice_audio.py cut audio/src/raw.mp4 --cues audio/work/segments.tsv
 
     #    → audio/clips/*.wav
 
-    # 3. 打包
+    # 3. Đóng gói
     python3 tools/slice_audio.py sprite
 
     #    → assets/audio/sprite.mp3 / sprite.ogg / sprite.json
 
-需要的套件（都能用 pip 裝，不必系統權限）：
+Thư viện cần thiết (đều cài bằng pip, không cần quyền hệ thống):
 
     pip install imageio-ffmpeg numpy pillow
 """
@@ -47,18 +47,18 @@ import wave
 
 import numpy as np
 
-# ── 路徑 ────────────────────────────────────────────────────────────
+# ── Đường dẫn ───────────────────────────────────────────────────────
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 WORK_DIR = os.path.join(ROOT, "audio", "work")
 CLIP_DIR = os.path.join(ROOT, "audio", "clips")
 OUT_DIR = os.path.join(ROOT, "assets", "audio")
 
-# 中介檔一律轉成這個規格，後面所有分析都以它為準
-SR = 32000          # 取樣率：機台音效都是方波/短促音，32k 綽綽有餘
-# sprite 裡片段之間留的空白秒數。留得夠寬有兩個作用：播放時不會吃到隔壁，
-# 而且網頁端可以靠「找出這些靜音」重新推算每段的位置 —— mp3 解碼會在開頭多出
-# 編碼器延遲，硬套 json 裡的偏移量會整批位移，對 37ms 的 tick 是致命的。
+# Mọi file trung gian đều chuyển về định dạng này, các bước phân tích sau đó đều dựa vào nó
+SR = 32000          # Tần số lấy mẫu: âm thanh máy đều là sóng vuông/tiếng ngắn gọn, 32k là đủ
+# Khoảng lặng (giây) giữa các đoạn trong sprite. Để đủ rộng để: lúc phát không lấn sang đoạn bên cạnh,
+# và web có thể tìm lại vị trí từng đoạn nhờ khoảng lặng này. Bộ mã hóa mp3 thêm độ trễ ở đầu,
+# dùng nguyên độ lệch trong json sẽ dịch cả bảng, với tick 37ms là sai hết.
 SPRITE_GAP = 0.10
 
 
@@ -73,7 +73,7 @@ def ffmpeg_exe():
     from shutil import which
     exe = which("ffmpeg")
     if not exe:
-        sys.exit("找不到 ffmpeg。請執行： pip install imageio-ffmpeg")
+        sys.exit("Không tìm thấy ffmpeg. Hãy chạy: pip install imageio-ffmpeg")
     return exe
 
 
@@ -84,11 +84,11 @@ def run_ffmpeg(args):
     cmd = [FFMPEG, "-hide_banner", "-loglevel", "error", "-y"] + args
     p = subprocess.run(cmd, capture_output=True, text=True)
     if p.returncode != 0:
-        sys.exit("ffmpeg 失敗：\n" + " ".join(cmd) + "\n" + p.stderr)
+        sys.exit("ffmpeg thất bại:\n" + " ".join(cmd) + "\n" + p.stderr)
 
 
 def to_mono_wav(src, dst):
-    """把任何來源（mp4 / mp3 / wav …）轉成單聲道 wav，後面都用它。"""
+    """Chuyển mọi nguồn (mp4 / mp3 / wav …) thành wav mono; mọi bước sau đều dùng file này."""
     os.makedirs(os.path.dirname(dst), exist_ok=True)
     run_ffmpeg(["-i", src, "-vn", "-ac", "1", "-ar", str(SR),
                 "-c:a", "pcm_s16le", dst])
@@ -98,12 +98,12 @@ def to_mono_wav(src, dst):
 def read_wav(path):
     with wave.open(path, "rb") as w:
         if w.getsampwidth() != 2:
-            sys.exit("只支援 16-bit wav：" + path)
+            sys.exit("Chỉ hỗ trợ wav 16-bit: " + path)
         data = np.frombuffer(w.readframes(w.getnframes()), dtype="<i2")
         return data.astype(np.float32) / 32768.0, w.getframerate()
 
 
-# ── 時間格式 ────────────────────────────────────────────────────────
+# ── Định dạng thời gian ─────────────────────────────────────────────
 
 def fmt_time(sec):
     m, s = divmod(float(sec), 60)
@@ -111,7 +111,7 @@ def fmt_time(sec):
 
 
 def parse_time(text):
-    """接受 mm:ss.mmm、ss.mmm 兩種寫法。"""
+    """Nhận cả hai dạng mm:ss.mmm và ss.mmm."""
     text = text.strip()
     if ":" in text:
         m, s = text.rsplit(":", 1)
@@ -122,24 +122,24 @@ def parse_time(text):
 # ── 1. analyze ──────────────────────────────────────────────────────
 
 def envelope(samples, hop):
-    """把波形壓成每 hop 個取樣一格的 RMS 包絡，之後偵測與畫圖都用它。"""
+    """Nén dạng sóng thành RMS mỗi hop mẫu một giá trị; phát hiện và vẽ hình đều dùng nó."""
     n = len(samples) // hop
     trimmed = samples[:n * hop].reshape(n, hop)
     return np.sqrt((trimmed ** 2).mean(axis=1) + 1e-12)
 
 
 def find_segments(samples, sr, thresh_db, min_sound, min_silence):
-    """用 RMS 門檻找出「有聲音」的區段。
+    """Tìm các đoạn "có tiếng" theo ngưỡng RMS.
 
-    自己算而不去解析 ffmpeg silencedetect 的輸出，是因為包絡本來就要拿來
-    畫波形圖，而且門檻、最短長度這些參數自己控制比較直覺。
+    Tự tính chứ không phân tích output của ffmpeg silencedetect, vì bao năng lượng này
+    vốn cũng dùng để vẽ dạng sóng, và tự điều khiển ngưỡng và độ dài tối thiểu trực quan hơn.
     """
-    hop = max(1, int(sr * 0.005))          # 5ms 一格
+    hop = max(1, int(sr * 0.005))          # 5ms một khung
     env = envelope(samples, hop)
     env_db = 20 * np.log10(env + 1e-12)
 
     loud = env_db > thresh_db
-    # 短暫的低谷不算分段（跑燈那種連續嗶聲中間會有小凹陷）
+    # Chỗ trũng ngắn không tính là ngắt đoạn (tiếng bíp liên tục của đèn chạy có chỗ lõm nhỏ ở giữa)
     gap_frames = max(1, int(min_silence / (hop / sr)))
     idx = np.flatnonzero(loud)
     if idx.size == 0:
@@ -165,11 +165,11 @@ def find_segments(samples, sr, thresh_db, min_sound, min_silence):
 
 
 def draw_waveform(env, hop, sr, segs, path, width=1800, row_sec=20.0):
-    """畫出標了編號的波形圖，方便對照影片找出哪一段是什麼。
+    """Vẽ dạng sóng có đánh số, để đối chiếu với video xem đoạn nào là gì.
 
-    每一列分成三條：上面放片段編號、中間是波形、下面是時間刻度。分開放是因為
-    跑燈那種密集的片段，編號疊在波形上會整排糊掉。編號還會上下交錯，相鄰的
-    窄片段才不會互相蓋住。
+    Mỗi hàng chia ba phần: phía trên là số đoạn, giữa là sóng, phía dưới là mốc thời gian.
+    Tách riêng vì các đoạn dày đặc như đèn chạy sẽ làm số chồng lên sóng và nhòe cả hàng.
+    Số còn xen kẽ hai tầng lên xuống để các đoạn hẹp liền nhau không che nhau.
     """
     from PIL import Image, ImageDraw
 
@@ -190,7 +190,7 @@ def draw_waveform(env, hop, sr, segs, path, width=1800, row_sec=20.0):
         base = wave_top + wave_h // 2
         d.line([(0, base), (width, base)], fill=(52, 48, 60))
 
-        # 波形包絡
+        # Đường bao dạng sóng
         for x in range(width):
             ta = t0 + (t1 - t0) * x / width
             tb = t0 + (t1 - t0) * (x + 1) / width
@@ -201,7 +201,7 @@ def draw_waveform(env, hop, sr, segs, path, width=1800, row_sec=20.0):
             h = int(min(chunk.max() * 3.2, 1.0) * (wave_h // 2 - 4))
             d.line([(x, base - h), (x, base + h)], fill=(120, 210, 255))
 
-        # 時間刻度：每列固定切 10 格，長短錄音都看得清楚
+        # Mốc thời gian: mỗi hàng luôn chia 10 khoảng, dù ghi âm dài hay ngắn đều dễ nhìn
         step = (t1 - t0) / 10 or 1
         for k in range(11):
             t = t0 + k * step
@@ -210,7 +210,7 @@ def draw_waveform(env, hop, sr, segs, path, width=1800, row_sec=20.0):
             d.text((min(x + 3, width - 52), wave_top + wave_h + 3),
                    fmt_time(t), fill=(140, 134, 150))
 
-        # 片段方框 + 編號（編號交錯兩層，避免相鄰窄片段疊字）
+        # Khung đoạn + số thứ tự (số xen kẽ hai tầng để tránh các đoạn hẹp liền nhau bị chồng chữ)
         level = 0
         prev_x = -999
         for i, (s, e) in enumerate(segs, 1):
@@ -234,12 +234,12 @@ def cmd_analyze(args):
     segs, env, hop = find_segments(samples, sr, args.threshold,
                                    args.min_sound, args.min_silence)
     if not segs:
-        sys.exit("沒偵測到任何聲音，試著把 --threshold 調低（例如 -50）")
+        sys.exit("Không phát hiện âm thanh nào, thử giảm --threshold (ví dụ -50)")
 
     tsv = os.path.join(WORK_DIR, "segments.tsv")
     with open(tsv, "w", encoding="utf-8") as f:
-        f.write("# 把 name 欄改成正式名稱，刪掉不要的列，再執行 cut\n")
-        f.write("# 名稱建議：coin bet tick land win_small win_big win_bar lose\n"
+        f.write("# Đổi cột name thành tên chính thức, xóa các dòng không cần, rồi chạy cut\n")
+        f.write("# Gợi ý tên: coin bet tick land win_small win_big win_bar lose\n"
                 "#           special bonus double_in double_roll double_win double_lose\n"
                 "#           wash payout\n")
         f.write("# name\tstart\tend\n")
@@ -257,11 +257,11 @@ def cmd_analyze(args):
         run_ffmpeg(["-i", mono, "-ss", "%.3f" % s, "-to", "%.3f" % e,
                     os.path.join(prev_dir, "seg_%03d.wav" % i)])
 
-    print("總長 %s，偵測到 %d 段" % (fmt_time(len(samples) / sr), len(segs)))
-    print("  片段清單 :", tsv)
-    print("  波形圖   :", png)
-    print("  試聽檔   :", prev_dir)
-    print("\n下一步：編輯 segments.tsv 填上名稱，再執行")
+    print("Tổng độ dài %s, phát hiện %d đoạn" % (fmt_time(len(samples) / sr), len(segs)))
+    print("  Danh sách đoạn :", tsv)
+    print("  Dạng sóng      :", png)
+    print("  File nghe thử :", prev_dir)
+    print("\nBước tiếp theo: sửa segments.tsv để điền tên, rồi chạy")
     print("  python3 tools/slice_audio.py cut %s --cues %s" % (args.source, tsv))
 
 
@@ -278,37 +278,37 @@ def read_cues(path):
             if len(parts) < 3:
                 parts = line.split()
             if len(parts) < 3:
-                sys.exit("第 %d 行看不懂（需要 名稱 開始 結束）：%s" % (lineno, line))
+                sys.exit("Dòng %d không đọc được (cần: tên bắt_đầu kết_thúc): %s" % (lineno, line))
             name, start, end = parts[0], parse_time(parts[1]), parse_time(parts[2])
             if end <= start:
-                sys.exit("第 %d 行的結束時間不在開始之後：%s" % (lineno, line))
-            # 第四欄（選填）是淡出毫秒數。切在旋律中間的長片段要拉長淡出，
-            # 不然結尾會斷得很突兀；短音效用預設的 3ms 就好。
+                sys.exit("Dòng %d: thời gian kết thúc phải sau thời gian bắt đầu: %s" % (lineno, line))
+            # Cột thứ tư (không bắt buộc) là thời gian fade-out tính bằng mili giây. Đoạn dài cắt giữa giai điệu cần fade-out dài hơn,
+            # nếu không phần kết sẽ bị cụt đột ngột; hiệu ứng ngắn thì dùng mặc định 3ms.
             fade = float(parts[3]) if len(parts) > 3 else None
             cues.append((name, start, end, fade))
     if not cues:
-        sys.exit("cue sheet 裡沒有任何有效的列：" + path)
+        sys.exit("Cue sheet không có dòng hợp lệ nào: " + path)
     return cues
 
 
 def cmd_cut(args):
     cues = read_cues(args.cues)
-    # 還沒改過名字的候選段落不切，避免整包 seg_001 這種檔名進到成品
+    # Bỏ qua các đoạn ứng viên chưa đặt tên, tránh tên kiểu seg_001 lọt vào sản phẩm cuối
     named = [c for c in cues if not re.fullmatch(r"seg_\d+", c[0])]
     if not named:
-        sys.exit("segments.tsv 裡的名稱都還是 seg_xxx —— 請先改成正式名稱再執行 cut")
+        sys.exit("Mọi tên trong segments.tsv vẫn là seg_xxx — hãy đổi thành tên chính thức trước khi chạy cut")
 
     os.makedirs(CLIP_DIR, exist_ok=True)
     mono = to_mono_wav(args.source, os.path.join(WORK_DIR, "source.wav"))
 
     for name, start, end, fade in named:
-        # ffmpeg 只做頻域的事：低頻隆隆聲、選用的降噪。
+        # ffmpeg chỉ làm phần tần số: lọc tiếng rù thấp, khử nhiễu (tùy chọn).
         #
-        # 去頭尾靜音、淡入淡出、正規化全部在 numpy 做，理由有二：
-        #   1. silenceremove + areverse + silenceremove 這個常見寫法會整段吃掉
-        #      （實測長 0.48s 的旋律變成 0.000s），濾波器串接的行為不好預期。
-        #   2. dynaudnorm 那類動態正規化會把衰減的尾音推上來、改掉音色，
-        #      而這裡的目標是保留真機音色，只要固定增益的峰值正規化。
+        # Cắt khoảng lặng đầu/cuối, fade-in/fade-out và chuẩn hóa đều làm trong numpy, vì hai lý do:
+        #   1. Cách viết thường gặp silenceremove + areverse + silenceremove sẽ cắt mất cả đoạn
+        #      (thử nghiệm: giai điệu dài 0.48s thành 0.000s), chuỗi bộ lọc không dự đoán được.
+        #   2. Chuẩn hóa động như dynaudnorm sẽ đẩy phần đuôi đang tắt dần lên và làm đổi âm sắc;
+        #      mục tiêu ở đây là giữ âm sắc máy thật, nên chỉ dùng chuẩn hóa đỉnh với hệ số cố định.
         chain = ["highpass=f=60"]
         if args.denoise:
             chain.append("afftdn=nf=-28")
@@ -319,8 +319,8 @@ def cmd_cut(args):
         polish_clip(dst, args.trim_threshold, args.peak_db, fade_out_ms=fade)
         print("  %-14s %6.3fs  %s" % (name, wav_duration(dst), dst))
 
-    print("\n切出 %d 段 → %s" % (len(named), CLIP_DIR))
-    print("下一步： python3 tools/slice_audio.py sprite")
+    print("\nĐã cắt %d đoạn → %s" % (len(named), CLIP_DIR))
+    print("Bước tiếp theo: python3 tools/slice_audio.py sprite")
 
 
 def wav_duration(path):
@@ -338,10 +338,10 @@ def write_wav(path, samples, sr=SR):
 
 
 def trim_silence(samples, sr, threshold_db, pad_ms=6.0):
-    """削掉頭尾的靜音，前後各留一點餘裕免得切到起音。
+    """Cắt khoảng lặng ở đầu và cuối, chừa một chút đệm để không cắt mất phần bắt đầu của âm.
 
-    只看頭尾，中間的空隙一律保留 —— 中獎旋律那種「音、停、音」的結構
-    不能被當成兩段。
+    Chỉ xét đầu và cuối; khoảng trống ở giữa luôn được giữ lại, vì cấu trúc
+    "tiếng – dừng – tiếng" của giai điệu trúng thưởng không được tách thành hai đoạn.
     """
     thr = 10 ** (threshold_db / 20.0)
     loud = np.flatnonzero(np.abs(samples) > thr)
@@ -352,16 +352,16 @@ def trim_silence(samples, sr, threshold_db, pad_ms=6.0):
 
 
 def polish_clip(path, trim_db, peak_db, fade_ms=3.0, fade_out_ms=None):
-    """去頭尾靜音 → 淡入淡出 → 峰值正規化。
+    """Bỏ khoảng lặng đầu/cuối → fade-in/fade-out → chuẩn hóa đỉnh.
 
-    淡出是必要的：切點如果落在波形非零的地方，播放結束會有「喀」的爆音。
-    切在旋律中間的長片段可以用 cue sheet 的第四欄指定較長的淡出。
-    正規化用固定增益（不是動態的），所以片段內部的強弱關係完全不變。
+    Fade-out là bắt buộc: nếu điểm cắt rơi vào chỗ sóng khác 0 thì lúc kết thúc sẽ có tiếng "tách".
+    Đoạn dài cắt giữa giai điệu có thể chỉ định fade-out dài hơn ở cột thứ tư của cue sheet.
+    Chuẩn hóa dùng hệ số cố định (không động), nên độ mạnh nhẹ bên trong đoạn không đổi.
     """
     samples, sr = read_wav(path)
     samples = trim_silence(samples, sr, trim_db)
     if not len(samples):
-        print("  ! %s 在 %d dB 門檻下整段都算靜音，請調低 --trim-threshold"
+        print("  ! %s toàn bộ là khoảng lặng ở ngưỡng %d dB, hãy giảm --trim-threshold"
               % (os.path.basename(path), trim_db))
         write_wav(path, samples, sr)
         return
@@ -385,16 +385,16 @@ def polish_clip(path, trim_db, peak_db, fade_ms=3.0, fade_out_ms=None):
 
 def cmd_sprite(args):
     if not os.path.isdir(CLIP_DIR):
-        sys.exit("找不到 %s，請先執行 cut" % CLIP_DIR)
+        sys.exit("Không tìm thấy %s, hãy chạy cut trước" % CLIP_DIR)
     clips = sorted(f for f in os.listdir(CLIP_DIR) if f.endswith(".wav"))
     if args.only:
         want = [n.strip() for n in args.only.split(",") if n.strip()]
         missing = [n for n in want if n + ".wav" not in clips]
         if missing:
-            sys.exit("找不到這些片段：" + ", ".join(missing))
+            sys.exit("Không tìm thấy các đoạn sau: " + ", ".join(missing))
         clips = [n + ".wav" for n in want]
     if not clips:
-        sys.exit("%s 裡沒有 wav" % CLIP_DIR)
+        sys.exit("Không có file wav nào trong %s" % CLIP_DIR)
 
     os.makedirs(OUT_DIR, exist_ok=True)
     gap = np.zeros(int(SR * SPRITE_GAP), dtype=np.float32)
@@ -403,7 +403,7 @@ def cmd_sprite(args):
     for f in clips:
         samples, sr = read_wav(os.path.join(CLIP_DIR, f))
         if sr != SR:
-            sys.exit("%s 的取樣率是 %d，預期 %d —— 請重跑 cut" % (f, sr, SR))
+            sys.exit("%s có tần số lấy mẫu %d, cần %d — hãy chạy lại cut" % (f, sr, SR))
         index[os.path.splitext(f)[0]] = [round(cursor, 4),
                                          round(len(samples) / SR, 4)]
         parts.append(samples)
@@ -432,7 +432,7 @@ def cmd_sprite(args):
         json.dump({"sampleRate": SR, "clips": index}, f,
                   ensure_ascii=False, indent=2, sort_keys=True)
 
-    print("打包 %d 段，總長 %.2fs" % (len(index), cursor))
+    print("Đã đóng gói %d đoạn, tổng độ dài %.2fs" % (len(index), cursor))
     for p in (mp3, ogg, meta):
         print("  %-28s %6.1f KB" % (os.path.relpath(p, ROOT), os.path.getsize(p) / 1024))
 
@@ -445,31 +445,31 @@ def main():
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
     sub = ap.add_subparsers(dest="cmd", required=True)
 
-    a = sub.add_parser("analyze", help="自動找出片段，產生清單與波形圖")
-    a.add_argument("source", help="來源檔（mp4 / mp3 / wav …）")
+    a = sub.add_parser("analyze", help="Tự động tìm đoạn âm thanh, tạo danh sách và dạng sóng")
+    a.add_argument("source", help="File nguồn (mp4 / mp3 / wav …)")
     a.add_argument("--threshold", type=float, default=-42.0,
-                   help="判定為有聲音的 dBFS 門檻，底噪大就調高（預設 -42）")
+                   help="Ngưỡng dBFS để coi là có tiếng; nhiễu nền lớn thì tăng lên (mặc định -42)")
     a.add_argument("--min-sound", type=float, default=0.03,
-                   help="片段最短秒數，太短的當雜訊丟掉（預設 0.03）")
+                   help="Độ dài tối thiểu của đoạn (giây), đoạn ngắn hơn sẽ bị coi là nhiễu (mặc định 0.03)")
     a.add_argument("--min-silence", type=float, default=0.08,
-                   help="間隔多久才算切開，跑燈連續嗶聲要調小（預設 0.08）")
+                   help="Khoảng lặng bao lâu thì tách đoạn (giây); tiếng bíp liên tục của đèn chạy thì giảm xuống (mặc định 0.08)")
     a.set_defaults(func=cmd_analyze)
 
-    c = sub.add_parser("cut", help="依 cue sheet 切出片段")
-    c.add_argument("source", help="來源檔（跟 analyze 用同一個）")
+    c = sub.add_parser("cut", help="Cắt đoạn theo cue sheet")
+    c.add_argument("source", help="File nguồn (dùng cùng file với analyze)")
     c.add_argument("--cues", default=os.path.join(WORK_DIR, "segments.tsv"))
     c.add_argument("--denoise", action="store_true",
-                   help="開啟降噪（底噪重再開，會讓音色變金屬感）")
+                   help="Bật khử nhiễu (nếu nhiễu nền lớn; bật lên sẽ làm âm sắc bị kim loại)")
     c.add_argument("--trim-threshold", type=int, default=-45,
-                   help="頭尾靜音的判定門檻 dB，底噪大就調高（預設 -45）")
+                   help="Ngưỡng dB để xác định khoảng lặng đầu/cuối; nhiễu nền lớn thì tăng lên (mặc định -45)")
     c.add_argument("--peak-db", type=float, default=-1.0,
-                   help="正規化的目標峰值 dBFS（預設 -1）")
+                   help="Mức đỉnh dBFS đích khi chuẩn hóa (mặc định -1)")
     c.set_defaults(func=cmd_cut)
 
-    s = sub.add_parser("sprite", help="把片段打包成單一檔案 + 偏移表")
+    s = sub.add_parser("sprite", help="Đóng gói các đoạn thành một file + bảng độ lệch")
     s.add_argument("--bitrate", default="64k")
     s.add_argument("--only", default="",
-                   help="只打包指定的片段（逗號分隔），順序照給的順序")
+                   help="Chỉ đóng gói các đoạn được chỉ định (phân cách bằng dấu phẩy), theo đúng thứ tự đã cho")
     s.set_defaults(func=cmd_sprite)
 
     args = ap.parse_args()

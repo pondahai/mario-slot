@@ -1,55 +1,59 @@
 /* ─────────────────────────────────────────────────────────────
-   小瑪莉（麻仔台 / 水果盤）模擬器
+   Tiểu Mary (Mary nhỏ / khay trái cây) — mô phỏng máy
 
-   玩法依照真實機台：投幣取得分數 → 用八個圖案鍵押注 → 按開始跑燈 →
-   跑燈停在有押注的圖案就依賠率得分 → 得分可以「比倍」猜大小翻倍，
-   或按「洗分」把得分收回分數。單一圖案押注上限 99 分。
-   （參考資料見 README.md）
+   Cách chơi giống máy thật: bỏ xu để có điểm → đặt cược bằng tám nút hình →
+   bấm Quay để đèn chạy → đèn dừng ở hình đã cược thì nhận thưởng theo tỷ lệ.
+   Điểm thắng có thể "Gấp đôi" bằng cách đoán lớn/nhỏ, hoặc bấm "Rút điểm"
+   để chuyển điểm thắng về điểm. Cược tối đa 99 điểm cho mỗi hình.
+   (Tài liệu tham khảo xem README.md)
 
-   盤面的 24 格、七段顯示器、按鍵位置全部是從原圖量出來的像素座標，
-   換算成百分比後寫在這裡；切圖流程見 tools/slice_assets.py。
+   24 ô của bảng, bảy đoạn LED và vị trí các nút đều là tọa độ pixel đo từ
+   ảnh gốc, đổi sang phần trăm rồi ghi ở đây; quy trình cắt ảnh xem
+   tools/slice_assets.py.
    ───────────────────────────────────────────────────────────── */
 
 'use strict';
 
-/* ── 機台設定 ──────────────────────────────────────────── */
+/* ── Cấu hình máy ──────────────────────────────────────── */
 
 const CONFIG = {
-    coinValue: 10,        // 投幣器面板標示「10 元」，一枚 10 分
-    exchangeRate: 5,      // 賠率牌標示「5 比 1」：退幣時 5 分換 1 枚
-    maxBetPerSymbol: 99,  // 真實機台單一圖案上限 99 分
-    maxCredit: 9999,      // 四位數七段顯示器
+    coinValue: 10,        // Khe xu ghi "10 đồng", mỗi xu = 10 điểm
+    exchangeRate: 5,      // Bảng tỷ lệ ghi "5 đổi 1": khi trả xu, 5 điểm đổi 1 xu
+    maxBetPerSymbol: 99,  // Máy thật giới hạn 99 điểm cho mỗi hình
+    maxCredit: 9999,      // Màn LED 7 đoạn bốn chữ số
     maxScore: 9999,
-    maxDoubleUps: 10,     // 連續比倍上限
-    bonusMultiplier: 10,  // 彩金格：押注總額 × 10
-    targetRTP: 0.90,      // 機台設定的返還率，跑燈結果會朝這個值收斂
-    steer: 0.03,          // 吃分／吐分控制器的積分速率：越大修正越快、波動越小
+    maxDoubleUps: 10,     // Số lần gấp đôi liên tiếp tối đa
+    bonusMultiplier: 10,  // Ô jackpot: tổng tiền cược × 10
+    targetRTP: 0.90,      // Tỷ lệ hoàn trả đặt cho máy; kết quả đèn sẽ hội tụ về giá trị này
+    steer: 0.03,          // Tốc độ tích lũy của bộ điều khiển ăn/nhả điểm: lớn thì chỉnh nhanh hơn, dao động ít hơn
 };
 
-/* ── 音效 ──────────────────────────────────────────────────
+/* ── Âm thanh ──────────────────────────────────────────────
 
-   音源是真機錄音，用 tools/slice_audio.py 切好、接成一個 sprite
-   （assets/audio/sprite.ogg / .mp3 + sprite.json）。
+   Nguồn âm là bản ghi âm máy thật, được tools/slice_audio.py cắt và
+   nối thành một sprite (assets/audio/sprite.ogg / .mp3 + sprite.json).
 
-   用 Web Audio 而不是 <audio> 元素：跑燈最快 34ms 就要響一次，
-   <audio> 的播放延遲和重複觸發根本跟不上。
+   Dùng Web Audio thay vì phần tử <audio>: đèn chạy nhanh nhất 34ms
+   phát một tiếng, độ trễ và phát lặp của <audio> không theo kịp.
 
-   關於偏移量：sprite.json 裡有每段的起點，但**不直接拿來用**。mp3 解碼
-   會在開頭多出編碼器延遲（約 1100 個取樣），整批偏移量會一起位移，對
-   37ms 的 tick 等於全錯。所以載入後改成從解碼結果裡「找出片段之間那
-   0.1 秒的靜音」來重新推算邊界，json 只用來提供名稱順序與備援。      */
+   Về độ lệch: sprite.json có điểm bắt đầu của từng đoạn, nhưng **không dùng
+   trực tiếp**. Khi giải mã mp3, trình duyệt thêm độ trễ của bộ mã hóa
+   (khoảng 1100 mẫu) và cả bảng độ lệch bị dịch theo, với tick 37ms là sai
+   hết. Vì vậy sau khi tải, code tìm lại khoảng im lặng 0.1 giây giữa các
+   đoạn trong dữ liệu đã giải mã để tính biên; json chỉ dùng cho thứ tự tên và
+   phương án dự phòng.                                                     */
 
 const Sound = {
     ctx: null,
     buffer: null,
-    clips: {},          // name → [起點秒, 長度秒]
+    clips: {},          // tên → [giây bắt đầu, độ dài (giây)]
     ready: false,
     enabled: true,
     volume: 0.7,
     _master: null,
-    _live: {},          // name → 正在播放的 source，長音效用來自我中斷
+    _live: {},          // tên → nguồn đang phát; dùng để tự ngắt âm thanh dài
 
-    /** 第一次使用者互動時才建立 AudioContext —— 瀏覽器會擋掉更早的嘗試。 */
+    /** Chỉ tạo AudioContext khi người dùng tương tác lần đầu — trình duyệt sẽ chặn các lần thử trước đó. */
     unlock() {
         if (!this.ctx) {
             const AC = window.AudioContext || window.webkitAudioContext;
@@ -73,15 +77,16 @@ const Sound = {
             this.clips = this._mapClips(meta);
             this.ready = true;
         } catch (err) {
-            console.warn('音效載入失敗，遊戲照常運作：', err);
+            console.warn('Tải âm thanh thất bại, trò chơi vẫn chạy bình thường:', err);
         }
     },
 
     /**
-     * 從解碼後的波形找出片段邊界。
+     * Tìm biên của các đoạn từ dạng sóng đã giải mã.
      *
-     * 片段之間有 0.1 秒的數位靜音，找出這些靜音就能重建每段的位置，
-     * 不受編碼器延遲影響。數量對不上時退回 json 裡的偏移量。
+     * Giữa các đoạn có 0.1 giây im lặng kỹ thuật số; tìm những khoảng im lặng
+     * này là dựng lại được vị trí từng đoạn, không bị ảnh hưởng bởi độ trễ
+     * của bộ mã hóa. Nếu số đoạn không khớp thì quay về độ lệch trong json.
      */
     _mapClips(meta) {
         const names = Object.keys(meta.clips).sort(
@@ -89,8 +94,8 @@ const Sound = {
         const data = this.buffer.getChannelData(0);
         const sr = this.buffer.sampleRate;
         const win = Math.max(1, Math.round(sr * 0.005));
-        const quiet = 0.004;                       // 約 −48 dBFS
-        const minGap = Math.round(0.05 / 0.005);   // 至少 50ms 才算間隔
+        const quiet = 0.004;                       // khoảng −48 dBFS
+        const minGap = Math.round(0.05 / 0.005);   // khoảng cách tối thiểu 50ms mới tính là ngắt
 
         const regions = [];
         let start = -1, run = 0;
@@ -117,14 +122,14 @@ const Sound = {
                 out[n] = [regions[i][0], regions[i][1] - regions[i][0]];
             });
         } else {
-            console.warn('音效邊界偵測到 %d 段、預期 %d 段，改用 json 偏移量',
+            console.warn('Phát hiện %d đoạn âm thanh, dự kiến %d đoạn; dùng độ lệch từ json',
                          regions.length, names.length);
             names.forEach(n => { out[n] = meta.clips[n].slice(); });
         }
         return out;
     },
 
-    /** 播放一段。rate 可以微調音高，solo 會中斷同名的前一次播放。 */
+    /** Phát một đoạn. rate để chỉnh cao độ nhẹ; solo sẽ ngắt lần phát trước cùng tên. */
     play(name, opts = {}) {
         if (!this.ready || !this.enabled) return;
         const clip = this.clips[name];
@@ -132,7 +137,7 @@ const Sound = {
         if (this.ctx.state === 'suspended') this.ctx.resume();
 
         if (opts.solo && this._live[name]) {
-            try { this._live[name].stop(); } catch (e) { /* 已經停了 */ }
+            try { this._live[name].stop(); } catch (e) { /* đã dừng rồi */ }
         }
 
         const src = this.ctx.createBufferSource();
@@ -148,11 +153,11 @@ const Sound = {
         }
     },
 
-    /** 停掉某個正在播放的長音效（只對用 solo 播的有效）。 */
+    /** Dừng một âm thanh dài đang phát (chỉ có tác dụng với âm phát bằng solo). */
     stop(name) {
         const src = this._live[name];
         if (!src) return;
-        try { src.stop(); } catch (e) { /* 已經播完了 */ }
+        try { src.stop(); } catch (e) { /* đã phát xong */ }
         this._live[name] = null;
     },
 
@@ -174,42 +179,42 @@ const Sound = {
     },
 };
 
-// 跑燈的四顆 tick 輪流播放。真機的跑燈是一段音階，單顆重複會很單調。
+// Bốn tiếng tick phát luân phiên khi đèn chạy. Máy thật có đèn chạy theo một dãy nốt, lặp một tiếng sẽ rất đơn điệu.
 const TICKS = ['tick1', 'tick2', 'tick3', 'tick4'];
 
-/* ── 八個可押注圖案與賠率 ──────────────────────────────── */
+/* ── Tám hình có thể cược và tỷ lệ thưởng ──────────────── */
 
 const SYMBOLS = {
-    bar:        { name: 'BAR',  odds: 100 },
-    seven:      { name: '77',   odds: 40 },
-    star:       { name: '雙星', odds: 30 },
-    olive:      { name: '橄欖', odds: 25 },
-    bell:       { name: '鈴鐺', odds: 20 },
-    watermelon: { name: '西瓜', odds: 15 },
-    orange:     { name: '橘子', odds: 10 },
-    apple:      { name: '蘋果', odds: 5 },
+    bar:        { name: 'BAR',       odds: 100 },
+    seven:      { name: '77',        odds: 40 },
+    star:       { name: 'Sao đôi',   odds: 30 },
+    olive:      { name: 'Ô liu',     odds: 25 },
+    bell:       { name: 'Chuông',    odds: 20 },
+    watermelon: { name: 'Dưa hấu',   odds: 15 },
+    orange:     { name: 'Cam',       odds: 10 },
+    apple:      { name: 'Táo',       odds: 5 },
 };
 
-// 按鍵盤與盤面計數器由左到右的順序（兩者一致）
+// Thứ tự từ trái sang phải của nút cược và bộ đếm trên bảng (hai bên khớp nhau)
 const BET_ORDER = ['bar', 'seven', 'star', 'olive', 'bell', 'watermelon', 'orange', 'apple'];
 
-/* ── 盤面 24 格（index 0 = 左上角，順時鐘） ──────────────
-   對照原圖：特別 = 戰神頭像 / 印章，彩金 = 金色紋飾。        */
+/* ── 24 ô của bảng (index 0 = góc trên bên trái, theo chiều kim đồng hồ) ──────────────
+   Đối chiếu ảnh gốc: đặc biệt = đầu tướng / con dấu, jackpot = hoa văn vàng.        */
 
 const BOARD = [
-    'orange', 'bell', 'special', 'bar', 'special', 'apple', 'watermelon',  //  0–6  上排
-    'olive', 'olive', 'bonus', 'apple', 'orange',                          //  7–11 右排
-    'orange', 'bell', 'seven', 'bar', 'seven', 'watermelon', 'watermelon', // 12–18 下排
-    'star', 'star', 'bonus', 'apple', 'bell',                              // 19–23 左排
+    'orange', 'bell', 'special', 'bar', 'special', 'apple', 'watermelon',  //  0–6  hàng trên
+    'olive', 'olive', 'bonus', 'apple', 'orange',                          //  7–11 cột phải
+    'orange', 'bell', 'seven', 'bar', 'seven', 'watermelon', 'watermelon', // 12–18 hàng dưới
+    'star', 'star', 'bonus', 'apple', 'bell',                              // 19–23 cột trái
 ];
 
-/* ── 版面幾何（全部是量出來的像素，換算成百分比） ─────── */
+/* ── Hình học bố cục (toàn bộ là pixel đo được, đổi sang phần trăm) ─────── */
 
 const BOARD_PX = { w: 466, h: 549 };
-const RING = { x0: 67, y0: 88, cw: 48.0, ch: 48.143 };   // 7×7 外圈
-const METER = { x0: 52, pitch: 46.75 };   // 尺寸與 y 由 styles.css 的 .bet-meter 決定
+const RING = { x0: 67, y0: 88, cw: 48.0, ch: 48.143 };   // vòng ngoài 7×7
+const METER = { x0: 52, pitch: 46.75 };   // kích thước và y do .bet-meter trong styles.css quyết định
 
-// 24 格在 7×7 網格上的 (col,row)，順時鐘
+// Vị trí (cột,hàng) của 24 ô trên lưới 7×7, theo chiều kim đồng hồ
 const RING_CELLS = (() => {
     const out = [];
     for (let c = 0; c < 7; c++) out.push([c, 0]);
@@ -221,22 +226,22 @@ const RING_CELLS = (() => {
 
 const PANEL_PX = { w: 380, h: 187 };
 
-// 上排六顆控制鍵，由左至右（黃 / 橙橙 / 紅紅 / 藍）
+// Sáu nút điều khiển hàng trên, từ trái sang phải (vàng / cam cam / đỏ đỏ / xanh)
 const CONTROL_KEYS = [
-    { id: 'wash',   label: '洗分',   rect: [55, 28, 27, 42], hint: '得分收進分數；得分為 0 時退幣' },
-    { id: 'betall', label: '全押',   rect: [114, 29, 29, 41], hint: '八個圖案各押 1 分' },
-    { id: 'small',  label: '小',     rect: [147, 29, 30, 41], hint: '比倍猜小（1–7）' },
-    { id: 'big',    label: '大',     rect: [207, 30, 28, 41], hint: '比倍猜大（8–14）' },
-    { id: 'double', label: '比倍',   rect: [238, 30, 28, 41], hint: '得分翻倍挑戰' },
-    { id: 'start',  label: '開始',   rect: [295, 29, 28, 41], hint: '開始跑燈' },
+    { id: 'wash',   label: 'Rút',       rect: [55, 28, 27, 42],  hint: 'Chuyển điểm thắng vào điểm; nếu điểm thắng là 0 thì trả xu' },
+    { id: 'betall', label: 'Tất cả',    rect: [114, 29, 29, 41], hint: 'Cược 1 điểm cho cả tám hình' },
+    { id: 'small',  label: 'Nhỏ',       rect: [147, 29, 30, 41], hint: 'Gấp đôi: đoán Nhỏ (1–7)' },
+    { id: 'big',    label: 'Lớn',       rect: [207, 30, 28, 41], hint: 'Gấp đôi: đoán Lớn (8–14)' },
+    { id: 'double', label: 'Gấp đôi',   rect: [238, 30, 28, 41], hint: 'Thử gấp đôi điểm thắng' },
+    { id: 'start',  label: 'Quay',      rect: [295, 29, 28, 41], hint: 'Bắt đầu chạy đèn' },
 ];
 
-// 下排八顆押注鍵 + 上方的圖案磁磚（用來標示中獎圖案）
+// Tám nút cược hàng dưới + ô hiển thị hình phía trên (dùng để đánh dấu hình trúng)
 const BET_KEY_X = [50, 83, 116, 147, 203, 236, 267, 299];
 const BET_KEY = { y: 112, h: 37, w: 29 };
 const BET_ICON = { y: 78, h: 33 };
 
-/* ── 七段顯示器 ────────────────────────────────────────── */
+/* ── Màn LED 7 đoạn ────────────────────────────────────── */
 
 const SEG_MAP = {
     0: 'abcdef', 1: 'bc', 2: 'abdeg', 3: 'abcdg', 4: 'bcfg',
@@ -276,11 +281,11 @@ function fillDisplay(el, count) {
     for (let i = 0; i < count; i++) el.appendChild(buildDigit());
 }
 
-/** 把 value 寫進顯示器；blank = true 時整排熄掉（比倍時用來閃號碼）。 */
+/** Ghi value vào màn hình; blank = true thì tắt sáng cả dãy (dùng để nhấp nháy số khi gấp đôi). */
 function writeDisplay(el, value, opts = {}) {
     const digits = [...el.children];
     const text = opts.blank ? '' : String(Math.max(0, Math.round(value)));
-    // 靠右對齊，左邊補空白（真實機台前導零是熄的）
+    // Căn phải, phần bên trái đệm khoảng trắng (máy thật thì số 0 đứng đầu bị tắt)
     const padded = text.padStart(digits.length, ' ').slice(-digits.length);
     digits.forEach((svg, i) => {
         const ch = padded[i];
@@ -291,31 +296,33 @@ function writeDisplay(el, value, opts = {}) {
     });
 }
 
-/* ── 遊戲狀態 ──────────────────────────────────────────── */
+/* ── Trạng thái trò chơi ───────────────────────────────── */
 
 const state = {
     credit: 0,
     score: 0,
     bets: Object.fromEntries(BET_ORDER.map(k => [k, 0])),
     phase: 'idle',        // idle | spinning | won | double | reveal
-    pos: 0,               // 跑燈目前位置
+    pos: 0,               // vị trí hiện tại của đèn chạy
     doubleCount: 0,
-    pendingSpecial: 0,    // 「特別」累積的免費開獎次數
-    gamma: -1.5,          // 吃分／吐分控制器的積分狀態（見 pickCell）
-    stakeRef: 8,          // 押注規模的移動平均，用來把控制器誤差無因次化
-    totalIn: 0,           // 累計投注
-    totalOut: 0,          // 累計得分
+    pendingSpecial: 0,    // số lượt quay miễn phí tích lũy từ "đặc biệt"
+    gamma: -1.5,          // trạng thái tích lũy của bộ điều khiển ăn/nhả điểm (xem pickCell)
+    stakeRef: 8,          // trung bình trượt của quy mô cược, dùng để không thứ nguyên hóa sai số của bộ điều khiển
+    totalIn: 0,           // tổng tiền đã cược
+    totalOut: 0,          // tổng điểm đã trả ra
 };
 
-/* ── 存檔 ──────────────────────────────────────────────────
+/* ── Lưu trạng thái ────────────────────────────────────────
 
-   關掉分頁再回來，機台應該還在原本的樣子 —— 分數、押注、累積的「特別」，
-   還有吃分／吐分控制器的積分狀態（gamma）和累計統計。控制器的狀態一定要
-   一起存：只存分數的話，重開等於把機台的記憶洗掉，玩家隨時能靠重整
-   把返還率控制器歸零。
+   Đóng tab rồi mở lại, máy vẫn ở đúng trạng thái cũ: điểm, tiền cược, số lần
+   "đặc biệt" còn lại, và cả trạng thái tích lũy (gamma) cùng thống kê của bộ
+   điều khiển. Phải lưu luôn trạng thái bộ điều khiển: nếu chỉ lưu điểm thì
+   tải lại trang đồng nghĩa xóa trí nhớ ăn/nhả điểm của máy, và người chơi có
+   thể reset bộ điều khiển về 0 bằng cách tải lại.
 
-   跑燈中（spinning）和比倍開號碼中（reveal）是動畫的中間狀態，不存檔；
-   萬一在這時候關掉，回來時會退回上一個穩定狀態（押注還在，該局沒發生）。 */
+   Trạng thái đang quay (spinning) và đang mở số gấp đôi (reveal) là trạng thái
+   trung gian của hoạt ảnh nên không lưu; nếu tắt lúc đó thì khi mở lại sẽ quay
+   về trạng thái ổn định trước đó (tiền cược còn, ván đó coi như chưa diễn ra). */
 
 const SAVE_KEY = 'marioSlotSave';
 const SAVE_VERSION = 1;
@@ -328,7 +335,7 @@ function saveState() {
             credit: state.credit,
             score: state.score,
             bets: state.bets,
-            // 比倍途中關掉，回來時停在「有得分」的狀態，讓玩家自己決定要不要再比
+            // Tắt giữa lúc gấp đôi thì khi mở lại dừng ở trạng thái "có điểm thắng", để người chơi tự quyết định có đoán tiếp không
             phase: state.phase === 'double' ? 'won' : state.phase,
             pos: state.pos,
             doubleCount: state.doubleCount,
@@ -339,11 +346,11 @@ function saveState() {
             totalOut: state.totalOut,
         }));
     } catch (e) {
-        // 無痕模式或空間不足：存不了就算了，遊戲照常能玩
+        // Chế độ ẩn danh hoặc hết dung lượng: không lưu được thì thôi, vẫn chơi bình thường
     }
 }
 
-/** 讀回存檔並套進 state。回傳有沒有讀到。 */
+/** Đọc lại dữ liệu đã lưu và nạp vào state. Trả về có đọc được hay không. */
 function loadState() {
     let saved;
     try {
@@ -373,9 +380,9 @@ function loadState() {
         state.bets[s] = Math.round(num(bets[s], 0, CONFIG.maxBetPerSymbol, 0));
     });
 
-    // 只有「有得分待處理」才需要留在 won，其餘一律回到可以下注的 idle
+    // Chỉ khi "có điểm thắng đang chờ xử lý" mới ở lại won, còn lại đều về idle để có thể đặt cược
     state.phase = (saved.phase === 'won' && state.score > 0) ? 'won' : 'idle';
-    if (state.phase === 'idle') state.doubleCount = 0;   // 比倍次數只在同一筆得分內累計
+    if (state.phase === 'idle') state.doubleCount = 0;   // số lần gấp đôi chỉ tính trong cùng một khoản điểm thắng
 
     return true;
 }
@@ -386,7 +393,7 @@ const meters = [];
 const keys = {};
 const iconMarks = {};
 
-/* ── 初始化 ────────────────────────────────────────────── */
+/* ── Khởi tạo ──────────────────────────────────────────── */
 
 document.addEventListener('DOMContentLoaded', () => {
     el.credit = document.getElementById('disp-credit');
@@ -405,18 +412,18 @@ document.addEventListener('DOMContentLoaded', () => {
     bindGlobal();
 
     document.getElementById('rtp-note').textContent =
-        `返還率設定 ${(CONFIG.targetRTP * 100).toFixed(0)}%。跑燈結果由機率控制器決定，` +
-        `會依照累計投注／得分把實際返還率拉回設定值 —— 真實機台也是這樣「吃分吐分」的。`;
+        `Tỷ lệ hoàn trả đặt ${(CONFIG.targetRTP * 100).toFixed(0)}%. Kết quả đèn chạy do bộ điều khiển xác suất quyết định, ` +
+        `bộ này dựa trên tổng cược và điểm đã trả để kéo tỷ lệ hoàn trả thực tế về giá trị đã đặt — máy thật cũng ăn điểm và nhả điểm như vậy.`;
 
     const resumed = loadState();
-    if (!resumed) state.credit = 100;   // 第一次開機先送 100 分，免得只能盯著投幣器
+    if (!resumed) state.credit = 100;   // lần đầu mở máy tặng 100 điểm để khỏi chỉ nhìn khe xu
 
-    // 跑燈停在上次的位置，看得出來機台是接著上一局繼續
+    // Đèn dừng ở vị trí lần trước, để thấy máy tiếp tục từ ván trước
     lamps[state.pos].classList.add('landed');
     if (resumed) {
         showBanner(state.score > 0
-            ? `接續上次　分數 ${state.credit}　得分 ${state.score}`
-            : `接續上次　分數 ${state.credit}`);
+            ? `Tiếp tục ván trước　điểm ${state.credit}　điểm thắng ${state.score}`
+            : `Tiếp tục ván trước　điểm ${state.credit}`);
     }
 
     render();
@@ -474,7 +481,7 @@ function buildKeys() {
         const b = document.createElement('button');
         b.className = 'key key-bet';
         b.type = 'button';
-        b.title = `押 ${SYMBOLS[sym].name}（${SYMBOLS[sym].odds} 倍）　快捷鍵 ${i + 1}`;
+        b.title = `Cược ${SYMBOLS[sym].name} (${SYMBOLS[sym].odds} lần)　Phím tắt ${i + 1}`;
         b.innerHTML = '<span class="amt"></span>';
         place(b, x, BET_KEY.y, BET_KEY.w, BET_KEY.h);
         b.addEventListener('click', () => placeBet(sym));
@@ -497,14 +504,14 @@ function buildOddsTable() {
     const counts = {};
     BOARD.forEach(s => { counts[s] = (counts[s] || 0) + 1; });
     const rows = BET_ORDER.map(s =>
-        `<tr><td>${SYMBOLS[s].name}</td><td>${SYMBOLS[s].odds} 倍</td><td>${counts[s]} 格</td></tr>`);
-    rows.push(`<tr><td>特別</td><td>免費再開</td><td>${counts.special} 格</td></tr>`);
-    rows.push(`<tr><td>彩金</td><td>總押 ×${CONFIG.bonusMultiplier}</td><td>${counts.bonus} 格</td></tr>`);
+        `<tr><td>${SYMBOLS[s].name}</td><td>${SYMBOLS[s].odds} lần</td><td>${counts[s]} ô</td></tr>`);
+    rows.push(`<tr><td>Đặc biệt</td><td>Quay miễn phí</td><td>${counts.special} ô</td></tr>`);
+    rows.push(`<tr><td>Jackpot</td><td>Tổng cược ×${CONFIG.bonusMultiplier}</td><td>${counts.bonus} ô</td></tr>`);
     t.innerHTML = rows.join('');
 }
 
 function bindGlobal() {
-    // 瀏覽器規定要有使用者互動才能出聲，所以第一次點擊／按鍵時才建立 AudioContext
+    // Trình duyệt yêu cầu có tương tác của người dùng mới được phát tiếng, nên chỉ tạo AudioContext ở lần bấm/phím đầu tiên
     const unlock = () => Sound.unlock();
     document.addEventListener('pointerdown', unlock, { once: true });
     document.addEventListener('keydown', unlock, { once: true });
@@ -540,11 +547,11 @@ function bindGlobal() {
     });
 }
 
-/* ── 玩家動作 ──────────────────────────────────────────── */
+/* ── Thao tác của người chơi ───────────────────────────── */
 
 function insertCoin() {
     if (state.phase === 'spinning' || state.phase === 'reveal') return;
-    if (state.credit + CONFIG.coinValue > CONFIG.maxCredit) return flash('分數已滿');
+    if (state.credit + CONFIG.coinValue > CONFIG.maxCredit) return flash('Điểm đã đầy');
     state.credit += CONFIG.coinValue;
     Sound.play('coin', { solo: true });
     render();
@@ -552,8 +559,8 @@ function insertCoin() {
 
 function placeBet(sym) {
     if (state.phase !== 'idle') return;
-    if (state.bets[sym] >= CONFIG.maxBetPerSymbol) return flash(`${SYMBOLS[sym].name} 已達上限 ${CONFIG.maxBetPerSymbol}`);
-    if (state.credit < 1) return flash('分數不足　請投幣');
+    if (state.bets[sym] >= CONFIG.maxBetPerSymbol) return flash(`${SYMBOLS[sym].name} đã đạt giới hạn ${CONFIG.maxBetPerSymbol}`);
+    if (state.credit < 1) return flash('Không đủ điểm, hãy bỏ xu');
     state.credit -= 1;
     state.bets[sym] += 1;
     Sound.play('bet');
@@ -563,8 +570,8 @@ function placeBet(sym) {
 function betAll() {
     if (state.phase !== 'idle') return;
     const room = BET_ORDER.filter(s => state.bets[s] < CONFIG.maxBetPerSymbol);
-    if (!room.length) return flash('押注已達上限');
-    if (state.credit < room.length) return flash('分數不足　請投幣');
+    if (!room.length) return flash('Cược đã đạt giới hạn');
+    if (state.credit < room.length) return flash('Không đủ điểm, hãy bỏ xu');
     state.credit -= room.length;
     room.forEach(s => { state.bets[s] += 1; });
     Sound.play('bet');
@@ -582,7 +589,7 @@ function onControl(id) {
     }
 }
 
-/** 洗分：有得分就把得分收進分數；沒得分就退幣。 */
+/** Rút điểm: có điểm thắng thì chuyển vào điểm; không có thì trả xu. */
 function wash() {
     if (state.phase === 'spinning' || state.phase === 'reveal') return;
 
@@ -590,7 +597,7 @@ function wash() {
         clearWinFx();
         Sound.stop('win');
         state.credit = Math.min(CONFIG.maxCredit, state.credit + state.score);
-        flash(`洗分 ${state.score} 分`);
+        flash(`Rút ${state.score} điểm`);
         state.score = 0;
         state.doubleCount = 0;
         state.phase = 'idle';
@@ -599,53 +606,58 @@ function wash() {
     }
 
     if (state.phase !== 'idle') return;
-    if (state.credit <= 0) return flash('沒有分數可退');
+    if (state.credit <= 0) return flash('Không có điểm để trả');
 
     const coins = Math.floor(state.credit / CONFIG.exchangeRate);
     const left = state.credit % CONFIG.exchangeRate;
-    if (!confirm(`退幣：${state.credit} 分 → ${coins} 枚（${CONFIG.exchangeRate} 比 1）` +
-                 (left ? `，餘 ${left} 分無法整除、將一併退清。` : '') + '\n確定要退幣嗎？')) return;
+    if (!confirm(`Trả xu: ${state.credit} điểm → ${coins} xu (${CONFIG.exchangeRate} điểm = 1 xu)` +
+                 (left ? `, dư ${left} điểm không chia hết, sẽ trả hết luôn.` : '') + '\nBạn có chắc muốn trả xu không?')) return;
     state.credit = 0;
-    flash(`退出 ${coins} 枚`);
+    flash(`Đã trả ${coins} xu`);
     render();
 }
 
-/* ── 開獎 ──────────────────────────────────────────────── */
+/* ── Quay thưởng ───────────────────────────────────────── */
 
 function totalBet() {
     return BET_ORDER.reduce((a, s) => a + state.bets[s], 0);
 }
 
 /**
- * 挑出跑燈要停的格子。
+ * Chọn ô để đèn dừng lại.
  *
- * 真實小瑪莉不是均勻亂數。這種台子的賠率（BAR 100 倍）如果配上均勻開獎，
- * 玩家八個圖案全押就是穩賺 —— 所以機台一定是靠控制器「吃分／吐分」把
- * 返還率壓在台主設定的數字上，這裡就照這個機制做。
+ * Máy thật không quay bằng số ngẫu nhiên đều. Với bảng tỷ lệ này (BAR 100 lần),
+ * nếu quay đều thì người chơi cược cả tám hình sẽ chắc chắn thắng — nên máy
+ * phải dùng bộ điều khiển "ăn điểm/nhả điểm" để giữ tỷ lệ hoàn trả quanh giá
+ * trị chủ máy đặt. Code ở đây làm đúng theo cơ chế đó.
  *
- * 每局對 24 格各自算「如果開這一格，要賠多少（payout）」，權重為
+ * Mỗi ván tính cho 24 ô: nếu dừng ở ô này thì máy phải trả bao nhiêu (payout),
+ * và trọng số là
  *
- *     weight = 基礎出現頻率 × exp(gamma × payout / 押注總額)
+ *     weight = tần suất cơ bản × exp(gamma × payout / tổng cược)
  *
- * gamma 是控制器的積分狀態（state.gamma）：每一局用實際賠出去的比例和
- * 設定值的差去修正它。機台賠超過設定值 → gamma 往負走 → 賠得多的格子被
- * 指數壓下去，開始吃分；賠不夠 → gamma 往正走 → 那些格子被放大，開始吐分。
+ * gamma là trạng thái tích lũy của bộ điều khiển (state.gamma): mỗi ván nó được
+ * chỉnh theo chênh lệch giữa tỷ lệ đã trả thực tế và giá trị đã đặt. Máy trả
+ * quá giá trị đặt → gamma đi xuống → các ô trả nhiều bị đè xuống theo hàm mũ,
+ * máy bắt đầu ăn điểm; trả chưa đủ → gamma đi lên → các ô đó được khuếch đại,
+ * máy bắt đầu nhả điểm.
  *
- * 兩個關鍵：
- *  1. gamma 要乘在 payout 上，改變權重的「斜率」。若只是對每一格加同一個
- *     偏移量，正規化時會整個消掉，等於沒有控制。
- *  2. 要用積分（逐局累加誤差）而不是比例（直接用誤差當增益）。比例控制會
- *     停在「誤差 × 增益」剛好撐住的地方，留下固定的穩態偏差。
+ * Hai điểm then chốt:
+ *  1. gamma phải nhân với payout, để thay đổi "độ dốc" của trọng số. Nếu chỉ cộng
+ *     cùng một độ lệch cho mọi ô thì khi chuẩn hóa nó sẽ triệt tiêu hết, không còn điều khiển gì.
+ *  2. Dùng tích phân (cộng dồn sai số qua các ván) chứ không dùng tỷ lệ (lấy
+ *     chính sai số làm hệ số khuếch đại). Điều khiển tỷ lệ sẽ dừng ở chỗ
+ *     "sai số × hệ số" vừa đủ giữ, để lại độ lệch ổn định cố định.
  */
 function pickCell() {
     const stake = Math.max(totalBet(), 1);
 
-    // 賠付比例（payout / 押注），無因次，所以 gamma 不會隨押注大小失準
+    // Tỷ lệ trả (payout / cược), không thứ nguyên, nên gamma không bị lệch khi cược lớn hay nhỏ
     const ratios = BOARD.map(sym => payoutOf(sym, stake) / stake);
     const exps = ratios.map(x => state.gamma * x);
     const top = Math.max(...exps);
 
-    // 減掉最大值再取 exp：數值穩定；下限 −9 讓極差的格子機率趨近零但不為零
+    // Trừ giá trị lớn nhất trước khi lấy exp cho ổn định số; cận dưới −9 làm xác suất các ô bị loại gần bằng 0 nhưng không bằng 0
     const weights = BOARD.map((sym, i) =>
         baseWeight(sym) * Math.exp(Math.max(exps[i] - top, -9)));
 
@@ -659,12 +671,13 @@ function pickCell() {
 }
 
 /**
- * 開完獎後回饋給控制器。
+ * Cập nhật bộ điều khiển sau khi mở thưởng.
  *
- * charged 是這局實際從玩家身上收走的押注 —— 「特別」送的免費開獎是 0。
- * 免費局照樣會賠分卻不進帳，所以誤差算的是「該收的抽成 − 實際賠出去的分」，
- * 免費局就變成純負誤差，控制器會在後面幾局把它吃回來。
- * 除以 stakeRef（押注規模的移動平均）只是為了讓 gamma 不隨押注大小漂移。
+ * charged là số tiền cược thực sự thu từ người chơi trong ván này; lượt "đặc biệt"
+ * miễn phí có charged = 0. Lượt miễn phí vẫn trả điểm nhưng không vào sổ, nên sai
+ * số tính là "phí thu lẽ ra phải có − điểm thực tế đã trả", lượt miễn phí sẽ
+ * thành sai số âm thuần túy và bộ điều khiển sẽ bù lại trong vài ván sau.
+ * Chia cho stakeRef (trung bình trượt quy mô cược) chỉ để gamma không trôi theo độ lớn cược.
  */
 function updateController(charged, payout) {
     state.stakeRef = state.stakeRef * 0.99 + Math.max(charged, 1) * 0.01;
@@ -672,28 +685,28 @@ function updateController(charged, payout) {
     state.gamma = Math.max(-40, Math.min(5, state.gamma + CONFIG.steer * err));
 }
 
-/** 基礎出現頻率：賠率越高的圖案越少出，讓開獎節奏像真機台。 */
+/** Tần suất cơ bản: hình có tỷ lệ càng cao thì càng ít xuất hiện, để nhịp quay giống máy thật. */
 function baseWeight(sym) {
     if (sym === 'special') return 0.8;
     if (sym === 'bonus') return 0.35;
     return Math.pow(20 / SYMBOLS[sym].odds, 0.6);
 }
 
-/** 若跑燈停在 sym 這一格，本局會賠給玩家多少分。 */
+/** Nếu đèn dừng ở ô sym, máy sẽ trả cho người chơi bao nhiêu điểm trong ván này. */
 function payoutOf(sym, stake) {
     if (sym === 'bonus') return stake * CONFIG.bonusMultiplier;
-    // 「特別」當下不賠分，但送一次免費開獎，期望值大約是押注 × 返還率
+    // "Đặc biệt" không trả điểm ngay, nhưng cho một lượt quay miễn phí; kỳ vọng xấp xỉ tiền cược × tỷ lệ hoàn trả
     if (sym === 'special') return stake * CONFIG.targetRTP;
     return state.bets[sym] * SYMBOLS[sym].odds;
 }
 
 function startSpin() {
-    if (state.phase === 'won') return flash('請先按 比倍 或 洗分');
+    if (state.phase === 'won') return flash('Hãy bấm Gấp đôi hoặc Rút điểm trước');
     if (state.phase !== 'idle') return;
 
     const stake = totalBet();
     const free = state.pendingSpecial > 0;
-    if (!free && stake === 0) return flash('請先押注');
+    if (!free && stake === 0) return flash('Hãy cược trước');
 
     state.phase = 'spinning';
     state.score = 0;
@@ -720,7 +733,7 @@ function startSpin() {
 
         if (i >= steps) return settle(target, stake, free ? 0 : stake);
 
-        // 起步加速、最後 22 步減速，跟真實跑燈的手感一樣
+        // Lúc đầu tăng tốc, 22 bước cuối giảm tốc, giống cảm giác của đèn chạy thật
         const left = steps - i;
         let delay = 34;
         if (i < 12) delay = 90 - i * 5;
@@ -732,7 +745,7 @@ function startSpin() {
 
 function settle(index, stake, charged) {
     const sym = BOARD[index];
-    // landed = 跑燈停在這裡（不管有沒有中），win = 真的中了才閃
+    // landed = đèn dừng ở đây (dù trúng hay không); win = chỉ nhấp nháy khi thật sự trúng
     lamps[index].classList.add('landed');
 
     if (sym === 'special') {
@@ -740,7 +753,7 @@ function settle(index, stake, charged) {
         updateController(charged, 0);
         state.phase = 'idle';
         lamps[index].classList.add('win');
-        showBanner('特別　押注保留　免費再開一次');
+        showBanner('Đặc biệt　Giữ nguyên cược　Quay miễn phí thêm một lần');
         render();
         return;
     }
@@ -748,16 +761,16 @@ function settle(index, stake, charged) {
     let won = 0;
     if (sym === 'bonus') {
         won = stake * CONFIG.bonusMultiplier;
-        if (won > 0) showBanner(`彩金！　總押 ${stake} × ${CONFIG.bonusMultiplier}　得 ${won} 分`);
-        else showBanner('彩金　但本局沒有押注');
+        if (won > 0) showBanner(`Jackpot!　Tổng cược ${stake} × ${CONFIG.bonusMultiplier}　được ${won} điểm`);
+        else showBanner('Jackpot　nhưng ván này không có cược');
     } else {
         const bet = state.bets[sym];
         won = bet * SYMBOLS[sym].odds;
         if (won > 0) {
             markIcon(sym);
-            showBanner(`${SYMBOLS[sym].name}　${bet} × ${SYMBOLS[sym].odds}　得 ${won} 分`);
+            showBanner(`${SYMBOLS[sym].name}　${bet} × ${SYMBOLS[sym].odds}　được ${won} điểm`);
         } else {
-            showBanner(`開出 ${SYMBOLS[sym].name}　沒押到`);
+            showBanner(`Ra ${SYMBOLS[sym].name}　không cược ô này`);
         }
     }
 
@@ -780,15 +793,15 @@ function clearBets() {
     BET_ORDER.forEach(s => { state.bets[s] = 0; });
 }
 
-/* ── 比倍（猜大小） ────────────────────────────────────── */
+/* ── Gấp đôi (đoán lớn nhỏ) ───────────────────────────── */
 
 function enterDouble() {
     if (state.phase !== 'won') return;
-    if (state.doubleCount >= CONFIG.maxDoubleUps) return flash(`已達比倍上限 ${CONFIG.maxDoubleUps} 次`);
-    if (state.score * 2 > CONFIG.maxScore) return flash('得分已達上限　請洗分');
+    if (state.doubleCount >= CONFIG.maxDoubleUps) return flash(`Đã đạt giới hạn gấp đôi ${CONFIG.maxDoubleUps} lần`);
+    if (state.score * 2 > CONFIG.maxScore) return flash('Điểm thắng đã đạt giới hạn, hãy rút điểm');
     state.phase = 'double';
     el.center.classList.add('flash');
-    showBanner(`比倍第 ${state.doubleCount + 1} 次　請按 小(1–7) 或 大(8–14)`);
+    showBanner(`Gấp đôi lần ${state.doubleCount + 1}　Bấm Nhỏ (1–7) hoặc Lớn (8–14)`);
     render();
 }
 
@@ -799,11 +812,12 @@ function guess(side) {
     el.center.classList.remove('flash');
     render();
 
-    // 1–14，小 = 1–7、大 = 8–14，各佔一半
+    // 1–14: Nhỏ = 1–7, Lớn = 8–14, mỗi bên một nửa
     const n = 1 + Math.floor(Math.random() * 14);
     const win = (side === 'small') ? n <= 7 : n >= 8;
+    const sideName = side === 'small' ? 'Nhỏ' : 'Lớn';
 
-    // 號碼滾動一下再定住
+    // Số lăn một lúc rồi mới dừng lại
     let rolls = 0;
     const roll = () => {
         rolls++;
@@ -818,27 +832,27 @@ function guess(side) {
         if (win) {
             state.doubleCount += 1;
             state.score = Math.min(CONFIG.maxScore, state.score * 2);
-            state.totalOut += state.score / 2;   // 翻倍多出來的部分也算機台吐出去的分
+            state.totalOut += state.score / 2;   // phần điểm nhân thêm khi gấp đôi cũng tính là máy đã trả ra
             state.phase = 'won';
-            showBanner(`開 ${n}　${side === 'small' ? '小' : '大'} 中！　得分 ${state.score}`);
+            showBanner(`Mở ${n}　${sideName} trúng!　Điểm thắng ${state.score}`);
         } else {
             state.score = 0;
             state.doubleCount = 0;
             state.phase = 'idle';
-            showBanner(`開 ${n}　${side === 'small' ? '小' : '大'} 沒中　得分歸零`);
+            showBanner(`Mở ${n}　${sideName} không trúng, điểm thắng về 0`);
         }
         render();
     };
     roll();
 }
 
-/* ── 畫面更新 ──────────────────────────────────────────── */
+/* ── Cập nhật màn hình ─────────────────────────────────── */
 
 function render() {
     writeDisplay(el.credit, state.credit);
     writeDisplay(el.score, state.score);
 
-    // 中央顯示器：閒置時顯示累積的「特別」次數，比倍時顯示號碼
+    // Màn hình giữa: lúc rảnh hiển thị số lần "đặc biệt" tích lũy, lúc gấp đôi hiển thị số đang mở
     if (state.phase === 'double') writeDisplay(el.center, 0, { blank: true });
     else if (state.phase !== 'reveal') {
         writeDisplay(el.center, state.pendingSpecial, { blank: state.pendingSpecial === 0 });
@@ -867,7 +881,7 @@ function render() {
 
     document.getElementById('coin-slot').disabled = busy;
 
-    // render() 是所有狀態變動的共同出口，存檔掛在這裡就不會漏
+    // render() là điểm chung cho mọi thay đổi trạng thái, đặt lưu ở đây thì không bị sót
     saveState();
 }
 
@@ -882,7 +896,7 @@ function markIcon(sym) {
     if (m) m.classList.add('on');
 }
 
-/** 收掉中獎的閃爍（盤面那格 + 鍵盤上的圖案）。停格的靜態亮不動。 */
+/** Tắt nhấp nháy của ô trúng (ô trên bảng + biểu tượng trên bàn phím). Trạng thái đứng yên thì giữ nguyên. */
 function clearWinFx() {
     lamps.forEach(l => l.classList.remove('win'));
     Object.values(iconMarks).forEach(m => m.classList.remove('on'));
@@ -901,7 +915,7 @@ function hideBanner() {
 const flash = text => showBanner(text, 1500);
 
 function labelOf(sym) {
-    if (sym === 'special') return '特別';
-    if (sym === 'bonus') return '彩金';
-    return `${SYMBOLS[sym].name}　${SYMBOLS[sym].odds} 倍`;
+    if (sym === 'special') return 'Đặc biệt';
+    if (sym === 'bonus') return 'Jackpot';
+    return `${SYMBOLS[sym].name}　${SYMBOLS[sym].odds} lần`;
 }

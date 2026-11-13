@@ -1,24 +1,25 @@
 /* ─────────────────────────────────────────────────────────────
-   小瑪莉模擬器
+   Mô phỏng Tiểu Mary
 
-   版面座標系：.cabinet 是一個 660 × 830 的設計空間，四個零件用
-   百分比定位在裡面。零件內部的感應區（燈、顯示器、按鍵）再用該
-   零件自己的百分比定位，所以整台機器可以等比縮放。
+   Hệ tọa độ bố cục: .cabinet là một không gian thiết kế 660 × 830, bốn chi tiết
+   được định vị trong đó bằng phần trăm. Các vùng cảm ứng bên trong chi tiết
+   (đèn, màn hình, nút) lại định vị theo phần trăm của chính chi tiết đó,
+   nên toàn bộ máy có thể co giãn đều.
 
-   零件原始尺寸（tools/slice_assets.py 切出來的）：
+   Kích thước gốc của chi tiết (do tools/slice_assets.py cắt ra):
      board 466×549   panel 380×187   coin 112×215   sign 144×227
 
-   按鍵盤的對齊：面板上 8 個押注計數器的中心橫跨 board-local
-   x 71.5 → 398.75；按鍵盤上 8 顆押注鍵的中心橫跨 panel-local
-   x 64.5 → 313.5。兩者對齊得到縮放 1.3143、左偏移 −13.3，
-   縮放後按鍵盤寬 499.4，中心落在 board-local x 236 —— 正好是
-   輪盤（board-local x 67…403，中心 235）的中心線。
+   Căn chỉnh bàn phím: tâm 8 bộ đếm cược trên bảng trải từ board-local
+   x 71.5 → 398.75; tâm 8 nút cược trên bàn phím trải từ panel-local
+   x 64.5 → 313.5. Khớp hai bên cho ra tỷ lệ 1.3143, lệch trái −13.3;
+   sau khi co giãn bàn phím rộng 499.4, tâm nằm ở board-local x 236 —
+   đúng đường tâm của vòng quay (board-local x 67…403, tâm 235).
    ───────────────────────────────────────────────────────────── */
 
 :root {
     --lamp: #ffd24a;
     --led-on: #ff2b2b;
-    --led-off: #240402;   /* 熄滅的筆劃比視窗底色更暗，跟原圖一致 */
+    --led-off: #240402;   /* Nét LED tắt tối hơn nền cửa sổ, giống ảnh gốc */
     --ink: #e8e2d4;
 }
 
@@ -28,7 +29,8 @@ body {
     margin: 0;
     background: #14110f radial-gradient(circle at 50% 0%, #2b2521 0%, #0d0b0a 70%);
     color: var(--ink);
-    font-family: "Noto Sans TC", "PingFang TC", "Microsoft JhengHei", sans-serif;
+    /* Font có hỗ trợ đầy đủ dấu tiếng Việt */
+    font-family: "Noto Sans", "Segoe UI", "Helvetica Neue", Arial, sans-serif;
     min-height: 100vh;
 }
 
@@ -41,7 +43,7 @@ body {
     padding: 24px 20px 60px;
 }
 
-/* ── 機台 ───────────────────────────────────────────────── */
+/* ── Máy ───────────────────────────────────────────────── */
 
 .cabinet {
     position: relative;
@@ -51,8 +53,8 @@ body {
     flex: 0 1 660px;
     user-select: none;
 
-    /* 機台上的文字（按鍵名稱、面板標示、橫幅）全部以 em 表示，
-       字級綁在機台寬度上，縮小畫面時字會跟著等比縮。 */
+    /* Chữ trên máy (tên nút, nhãn bảng, thông báo) đều dùng đơn vị em, cỡ chữ bám theo
+       chiều rộng máy nên khi thu nhỏ màn hình chữ cũng thu theo tỷ lệ. */
     container-type: inline-size;
     font-size: 2.4cqw;
 }
@@ -72,16 +74,16 @@ body {
     -webkit-user-drag: none;
 }
 
-/* 主面板 20,8 → 466×549 */
+/* Bảng chính 20,8 → 466×549 */
 .piece-board { left: 3.030%; top: 0.964%; width: 70.606%; height: 66.145%; }
 
-/* 按鍵盤 6.7,577 → 499.4×245.8（見檔頭的對齊計算） */
+/* Bàn phím 6.7,577 → 499.4×245.8 (xem phần căn chỉnh ở đầu file) */
 .piece-panel { left: 1.020%; top: 69.518%; width: 75.667%; height: 29.614%; }
 
-/* 投幣器 508,8 → 112×215 */
+/* Khe đút xu 508,8 → 112×215 */
 .piece-coin { left: 76.970%; top: 0.964%; width: 16.970%; height: 25.904%; cursor: pointer; }
 
-/* 賠率牌 500,250 → 144×227 */
+/* Bảng tỷ lệ 500,250 → 144×227 */
 .piece-sign { left: 75.758%; top: 30.120%; width: 21.818%; height: 27.349%; }
 
 .piece-coin:hover > img { filter: drop-shadow(0 0 10px rgba(255, 220, 120, .8)); }
@@ -96,7 +98,7 @@ body {
     color: #d9c9a4;
 }
 
-/* ── 面板上的標示（蓋掉原圖糊掉的印刷字） ───────────────── */
+/* ── Nhãn trên bảng (che chữ in bị mờ trên ảnh gốc) ───── */
 
 .plate-label {
     position: absolute;
@@ -119,7 +121,7 @@ body {
 #label-credit { left: 25.32%; }   /* board-local x 118 */
 #label-score  { left: 54.94%; }   /* board-local x 256 */
 
-/* ── 七段顯示器 ─────────────────────────────────────────── */
+/* ── Màn LED 7 đoạn ───────────────────────────────────── */
 
 .seg-display {
     position: absolute;
@@ -130,8 +132,8 @@ body {
     z-index: 3;
 }
 
-/* 對齊原圖上的 LED 視窗（board-local）：
-   分數 (124,53) 80×35　得分 (261,53) 81×35　中央 (210,302) 49×36 */
+/* Khớp với cửa sổ LED trên ảnh gốc (board-local):
+   điểm (124,53) 80×35　điểm thắng (261,53) 81×35　giữa (210,302) 49×36 */
 #disp-credit { left: 26.61%; top: 9.65%; width: 17.17%; height: 6.38%; }
 #disp-score  { left: 56.01%; top: 9.65%; width: 17.38%; height: 6.38%; }
 #disp-center { left: 45.06%; top: 55.01%; width: 10.52%; height: 6.56%; }
@@ -146,11 +148,11 @@ body {
 .seg-display.flash { animation: seg-flash .45s steps(1, end) infinite; }
 @keyframes seg-flash { 50% { opacity: .18; } }
 
-/* ── 盤面下方的 8 個押注計數器 ──────────────────────────── */
+/* ── 8 bộ đếm cược dưới bảng ──────────────────────────── */
 
 .bet-meters { position: absolute; inset: 0; z-index: 3; pointer-events: none; }
 
-/* board-local y 481…511，x = 52 + 46.75i，寬 39 */
+/* board-local y 481…511, x = 52 + 46.75i, rộng 39 */
 .bet-meter {
     position: absolute;
     top: 87.61%;
@@ -164,7 +166,7 @@ body {
 .bet-meter.armed { animation: meter-pulse 1s ease-in-out infinite; }
 @keyframes meter-pulse { 50% { filter: brightness(1.7); } }
 
-/* ── 輪盤 24 格跑燈 ─────────────────────────────────────── */
+/* ── Đèn chạy 24 ô của vòng quay ──────────────────────── */
 
 .lamp-layer { position: absolute; inset: 0; z-index: 2; pointer-events: none; }
 
@@ -184,7 +186,7 @@ body {
     outline-offset: -2px;
 }
 
-/* 跑燈停下來的那一格：靜態亮著，不管有沒有中獎 */
+/* Ô đèn dừng lại: sáng đứng yên, bất kể có trúng thưởng hay không */
 .lamp.landed {
     background: radial-gradient(closest-side, rgba(255, 255, 255, .8), rgba(255, 210, 60, .5));
     box-shadow: 0 0 26px 10px rgba(255, 225, 120, 1),
@@ -193,8 +195,8 @@ body {
     outline-offset: -3px;
 }
 
-/* 中獎的那一格會閃，跟真機一樣。閃到下一局開始或按洗分為止。
-   關掉 transition 才閃得乾脆 —— .lamp 本身有 .08s 的漸變會把方波磨圓。 */
+/* Ô trúng thưởng sẽ nhấp nháy như máy thật, đến khi bắt đầu ván mới hoặc bấm Rút điểm.
+   Tắt transition để nhấp nháy dứt khoát — .lamp có hiệu ứng mờ dần 0.08s sẽ làm mềm cạnh xung. */
 .lamp.win {
     transition: none;
     animation: lamp-win .34s steps(1, end) infinite;
@@ -214,7 +216,7 @@ body {
     }
 }
 
-/* ── 中獎橫幅 ───────────────────────────────────────────── */
+/* ── Thông báo trúng thưởng ───────────────────────────── */
 
 .banner {
     position: absolute;
@@ -240,7 +242,7 @@ body {
 
 .banner.show { opacity: 1; transform: scale(1); }
 
-/* ── 按鍵盤上的感應區 ───────────────────────────────────── */
+/* ── Vùng cảm ứng trên bàn phím ───────────────────────── */
 
 .key-layer { position: absolute; inset: 0; z-index: 3; }
 
@@ -260,6 +262,7 @@ body {
     display: flex;
     align-items: center;
     justify-content: center;
+    text-align: center;
     text-shadow: 0 1px 2px #000, 0 0 5px #000;
 }
 
@@ -276,7 +279,7 @@ body {
 }
 @keyframes key-live { 50% { box-shadow: 0 0 0 2px rgba(255,220,120,.5), 0 0 6px 2px rgba(255,190,60,.35); } }
 
-/* 押注鍵上的數字（目前押了幾分） */
+/* Số trên nút cược (đang cược bao nhiêu điểm) */
 .key-bet .amt {
     font-size: 1.15em;
     color: #ffe9a8;
@@ -284,7 +287,7 @@ body {
 }
 .key-bet .amt:empty::before { content: ""; }
 
-/* 中獎圖案在鍵盤上的對應圖示，跟盤面那格同步閃 */
+/* Biểu tượng hình trúng thưởng trên bàn phím, nhấp nháy đồng bộ với ô trên bảng */
 .icon-mark {
     position: absolute;
     border-radius: 3px;
@@ -300,7 +303,7 @@ body {
     55.01%, 100% { opacity: 0; box-shadow: none; }
 }
 
-/* 會暈眩的使用者：改成不閃的持續高亮 */
+/* Người dễ chóng mặt: đổi sang sáng đứng yên, không nhấp nháy */
 @media (prefers-reduced-motion: reduce) {
     .lamp.win, .icon-mark.on { animation: none; }
     .lamp.win {
@@ -312,13 +315,13 @@ body {
     .bet-meter.armed, .key.live { animation: none; }
 }
 
-/* 校正模式：把所有感應區畫出來 */
+/* Chế độ hiệu chỉnh: vẽ toàn bộ vùng cảm ứng */
 body.debug .lamp        { outline: 1px dashed rgba(0, 255, 255, .8); outline-offset: -1px; }
 body.debug .key         { background: rgba(255, 0, 255, .28); outline: 1px solid #f0f; }
 body.debug .seg-display { outline: 1px solid #0f0; }
 body.debug .bet-meter   { outline: 1px solid #08f; }
 
-/* ── 側邊資訊 ───────────────────────────────────────────── */
+/* ── Thông tin bên cạnh ───────────────────────────────── */
 
 .hud {
     flex: 1 1 300px;

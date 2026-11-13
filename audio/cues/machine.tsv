@@ -1,15 +1,15 @@
-# 切割規則：從原始錄音切出音效的時間軸
+# Quy tắc cắt: mốc thời gian để cắt âm thanh từ bản ghi gốc
 #
-# 這份檔案是「配方」—— 跟 slice_assets.py 裡的像素座標同性質，是人工聽出來的
-# 成果，必須進版控。音檔本身不進版控（見 .gitignore）。
+# File này là "công thức" — cùng bản chất với tọa độ pixel trong slice_assets.py,
+# là kết quả nghe thủ công nên phải đưa vào quản lý phiên bản. File âm thanh gốc thì không (xem .gitignore).
 #
-# 重跑：把原始錄音放回 audio/src/，然後
+# Chạy lại: đặt bản ghi gốc vào audio/src/, rồi
 #   python3 tools/slice_audio.py cut audio/src/machine.mp3 --cues audio/cues/machine.tsv
 #
-# 時間由使用者聽辨標定；bet 的起點從聽感的 19.3 修正到 19.535，
-# 因為 19.30–19.54 只有背景音樂、沒有按鍵聲。
+# Mốc thời gian do người nghe xác định; điểm bắt đầu của bet được chỉnh từ 19.3 (nghe thấy) thành 19.535,
+# vì 19.30–19.54 chỉ có nhạc nền, không có tiếng bấm phím.
 #
-# 第四欄（選填）是淡出毫秒數，切在旋律中間的長片段要拉長，避免結尾斷得突兀。
+# Cột thứ tư (không bắt buộc) là thời gian fade-out tính bằng mili giây. Đoạn dài cắt giữa giai điệu cần kéo dài fade-out để tránh kết thúc đột ngột.
 #
 # name	start	end	fade_out_ms
 coin	17.280	18.560
@@ -19,7 +19,7 @@ tick2	24.598	24.635
 tick3	24.635	24.672
 tick4	24.672	24.709
 run_slow	22.560	23.700
-# 中獎音樂。跟在跑燈後面，起音實測在 27.860（27.86 有 -42.8dB 的能量低谷，
-# 前一段在那裡結束）。34.0 不是樂句結尾 —— 音樂一路延續到 36.5 都沒停，
-# 這段旋律沒有乾淨的段落邊界，所以照標定切、結尾用 400ms 淡出收掉。
+# Nhạc trúng thưởng. Nằm sau đèn chạy, điểm bắt đầu đo được 27.860 (tại 27.86 có chỗ năng lượng thấp −42.8dB,
+# đoạn trước kết thúc ở đó). 34.0 không phải kết thúc câu nhạc — nhạc kéo dài đến 36.5 không dừng,
+# đoạn giai điệu này không có ranh giới rõ ràng, nên cắt theo mốc đã định và kết thúc bằng fade-out 400ms.
 win	27.860	34.000	400
